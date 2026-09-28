@@ -1,0 +1,66 @@
+name: Build FilmFlex Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android APK
+        run: |
+          cd android
+          gradle wrapper
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Prepare APK in dedicated directory
+        run: |
+          mkdir -p android-apk
+          cp android/app/build/outputs/apk/release/*.apk android-apk/FilmFlex.apk
+          ls -la android-apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FilmFlex-Android-APK
+          path: android-apk/FilmFlex.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0.0
+          name: "FilmFlex Android APK v1.0.0"
+          body: |
+            ### 📱 FilmFlex pour Android (v1.0.0)
+            
+            Téléchargez l'application officielle FilmFlex pour votre smartphone, tablette ou Android TV Box !
+            
+            * 🎬 Streaming 4K Ultra HD avec reprise automatique
+            * ⚡ Moteur Torrentio 4K sans coupure
+            * 🇹🇳 Cinéma Tunisien (Dachra, Choufly Hal, Nouba...)
+            * 🎌 Anime Japonais (Attack on Titan, Demon Slayer...)
+            * 🛡️ Synchronisation Supabase des comptes et abonnements
+            * 🚫 Zéro publicité
+          files: android-apk/FilmFlex.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

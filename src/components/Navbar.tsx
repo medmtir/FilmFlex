@@ -14,6 +14,7 @@ import {
   LogIn,
   AlertCircle,
   X,
+  Smartphone,
 } from "lucide-react";
 import FilmFlexLogo from "./FilmFlexLogo";
 import { Profile, UserAccount } from "@/types";
@@ -142,6 +143,17 @@ export default function Navbar({
             </button>
           )}
 
+          {/* App Android Button */}
+          <a
+            href="/download"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/15 text-neutral-200 hover:text-white transition-all shadow-md hover:scale-105 cursor-pointer"
+            title="Télécharger l'application Android FilmFlex (.apk)"
+          >
+            <Smartphone className="w-3.5 h-3.5 text-[#E50914]" />
+            <span className="hidden md:inline">App Android</span>
+            <span className="md:hidden">APK</span>
+          </a>
+
           {/* Notifications Bell */}
           <button
             className="text-neutral-300 hover:text-white transition-colors p-1.5 hidden sm:block cursor-pointer"
@@ -261,6 +273,15 @@ export default function Navbar({
                       <LogIn className="w-4 h-4 text-blue-400" />
                       <span>Changer de Compte</span>
                     </button>
+
+                    <a
+                      href="/download"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                      className="w-full px-4 py-2 text-left text-xs text-neutral-300 hover:text-white hover:bg-neutral-800/60 flex items-center gap-2.5 transition-colors"
+                    >
+                      <Smartphone className="w-4 h-4 text-[#E50914]" />
+                      <span>Télécharger l&apos;App Android (.apk)</span>
+                    </a>
                   </div>
 
                   {/* Clean Logout (Se déconnecter) */}

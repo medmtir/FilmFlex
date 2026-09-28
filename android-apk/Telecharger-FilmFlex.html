@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Télécharger FilmFlex pour Android (.apk)</title>
+  <style>
+    body {
+      background-color: #0e0e12;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .card {
+      background: #18181c;
+      border: 1px solid #282830;
+      border-radius: 24px;
+      padding: 40px 30px;
+      max-width: 440px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      margin: 20px;
+    }
+    .logo {
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+    .logo span {
+      color: #e50914;
+    }
+    .badge {
+      display: inline-block;
+      background: rgba(229, 9, 20, 0.2);
+      border: 1px solid rgba(229, 9, 20, 0.4);
+      color: #ff4d58;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 999px;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+    }
+    p {
+      color: #a0a0aa;
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e50914;
+      color: white;
+      text-decoration: none;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 16px 32px;
+      border-radius: 999px;
+      box-shadow: 0 10px 30px rgba(229, 9, 20, 0.4);
+      transition: all 0.2s ease;
+      width: 80%;
+      margin-bottom: 20px;
+    }
+    .btn-download:hover {
+      background: #b80710;
+      transform: scale(1.03);
+    }
+    .qr-container {
+      margin-top: 25px;
+      padding-top: 25px;
+      border-top: 1px solid #282830;
+    }
+    .qr-container p {
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+    .qr-img {
+      width: 140px;
+      height: 140px;
+      border-radius: 12px;
+      background: white;
+      padding: 8px;
+    }
+    .features {
+      text-align: left;
+      margin: 20px 0;
+      font-size: 12px;
+      color: #d0d0d8;
+    }
+    .features li {
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">FILM<span>FLEX</span></div>
+    <div class="badge">Application Android Officielle (v1.0.0)</div>
+    <p>Regardez des milliers de films, séries, anime et cinéma tunisien en streaming 4K avec reprise de lecture automatique et 0 publicité.</p>
+
+    <a href="https://github.com/medmtir/FilmFlex/releases/latest/download/FilmFlex.apk" class="btn-download">
+      📥 Télécharger l'APK (FilmFlex.apk)
+    </a>
+
+    <div class="features">
+      <ul>
+        <li>✨ Compatible Smartphones, Tablettes & Android TV</li>
+        <li>⚡ Moteur Torrentio 4K sans coupure (Auto-Best)</li>
+        <li>🇹🇳 Cinéma Tunisien (Dachra, Choufly Hal, Nouba...)</li>
+        <li>🎌 Top Anime & Manga en VF et VOSTFR</li>
+        <li>🛡️ Synchronisation Supabase en temps réel</li>
+      </ul>
+    </div>
+
+    <div class="qr-container">
+      <p>Scannez ce QR Code avec votre téléphone Android pour télécharger directement :</p>
+      <img class="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=https://github.com/medmtir/FilmFlex/releases/latest/download/FilmFlex.apk" alt="QR Code Téléchargement FilmFlex APK">
+    </div>
+  </div>
+</body>
+</html>
