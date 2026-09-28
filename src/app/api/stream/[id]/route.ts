@@ -169,10 +169,15 @@ export async function GET(
       ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`
       : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
 
+    const stremioAppUrl = isSeries
+      ? `stremio:///detail/series/${imdbId}/${imdbId}:${season}:${episode}`
+      : `stremio:///detail/movie/${imdbId}`;
+
     return NextResponse.json(
       {
         streamUrl: browserStreamUrl,
         webStreamUrl,
+        stremioAppUrl,
         currentQuality: requestedQuality === "auto" ? "1080p" : requestedQuality,
         qualityMap,
         availableQualities: [

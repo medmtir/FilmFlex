@@ -80,43 +80,29 @@ export default function VideoPlayer({
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [castNotice, setCastNotice] = useState<string | null>(null);
 
-  // Streaming Engine & Server Mode ("native" HTML5 vs "cloud" Web Stream)
-  const [playerMode, setPlayerMode] = useState<"native" | "cloud">("native");
-  const [cloudServer, setCloudServer] = useState<"vidlink" | "autoembed">("vidlink");
+  // Streaming Engine & Stremio state
   const [streamUrl, setStreamUrl] = useState<string>("");
+  const [stremioAppUrl, setStremioAppUrl] = useState<string>("");
 
   // Quality & Subtitles
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
   const [qualityMap, setQualityMap] = useState<Record<string, string>>({});
   const [availableQualities, setAvailableQualities] = useState<QualityOption[]>([
     { key: "auto", label: "Auto (S'adapte à la connexion)" },
-    { key: "1080p", label: "1080p Full HD (Fluide)" },
-    { key: "720p", label: "720p HD (Rapide)" },
-    { key: "480p", label: "480p SD (Faible débit)" },
+    { key: "1080p", label: "1080p Full HD" },
+    { key: "720p", label: "720p HD (Fluide)" },
+    { key: "480p", label: "480p SD (Connexion faible)" },
+    { key: "4k", label: "4K Ultra HD" },
   ]);
   const [selectedSubtitle, setSelectedSubtitle] = useState<string>("sub_ar"); // Default Arabic
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [aspectMode] = useState<"contain" | "cover">("contain");
-  const [activeMenu, setActiveMenu] = useState<"quality" | "subtitles" | "audio" | "speed" | "server" | null>(null);
+  const [activeMenu, setActiveMenu] = useState<"quality" | "subtitles" | "audio" | "speed" | null>(null);
   const [nextCountdown, setNextCountdown] = useState<number | null>(null);
   const [isLandscapeMode, setIsLandscapeMode] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const nativeWatchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
-
-  // Cloud Stream URL Builder
-  const getCloudStreamUrl = (server = cloudServer) => {
-    if (server === "autoembed") {
-      return isSeries
-        ? `https://autoembed.co/tv/imdb/${imdbId}-${currentSeason}-${currentEpisode}`
-        : `https://autoembed.co/movie/imdb/${imdbId}`;
-    }
-    // Default FilmFlex HD 1 (VidLink with FilmFlex Red Theme)
-    return isSeries
-      ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`
-      : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
-  };
 
   // Mobile orientation handling
   useEffect(() => {
@@ -175,27 +161,6 @@ export default function VideoPlayer({
     setIsLandscapeMode((prev) => !prev);
   };
 
-  // Watchdog: If native HTML5 video stays loading or black for > 3.5s (e.g. on Vercel without Stremio), switch to Cloud Player
-  useEffect(() => {
-    if (isLoading && !isPlayingIntro && playerMode === "native") {
-      if (nativeWatchdogTimerRef.current) clearTimeout(nativeWatchdogTimerRef.current);
-      nativeWatchdogTimerRef.current = setTimeout(() => {
-        console.info("Native stream timeout — seamlessly switching to Cloud HD Server");
-        setPlayerMode("cloud");
-        setIsLoading(false);
-      }, 3500);
-    } else {
-      if (nativeWatchdogTimerRef.current) {
-        clearTimeout(nativeWatchdogTimerRef.current);
-        nativeWatchdogTimerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (nativeWatchdogTimerRef.current) clearTimeout(nativeWatchdogTimerRef.current);
-    };
-  }, [isLoading, isPlayingIntro, playerMode]);
-
   // Prevent browser media exceptions from breaking UI
   useEffect(() => {
     const handleRejection = (event: PromiseRejectionEvent) => {
@@ -211,7 +176,6 @@ export default function VideoPlayer({
       ) {
         event.preventDefault();
         event.stopPropagation();
-        setPlayerMode("cloud");
         setIsLoading(false);
       }
     };
@@ -238,19 +202,22 @@ export default function VideoPlayer({
         if (data.qualityMap) {
           setQualityMap(data.qualityMap);
         }
+        if (data.stremioAppUrl) {
+          setStremioAppUrl(data.stremioAppUrl);
+        }
         if (data.availableQualities && data.availableQualities.length > 0) {
           setAvailableQualities(data.availableQualities);
         }
       })
       .catch((err) => {
         console.error("Stream resolution error:", err);
-        setPlayerMode("cloud");
+        setIsLoading(false);
       });
   }, [imdbId, isSeries, currentSeason, currentEpisode, selectedQuality]);
 
   // 1b. HLS / Video Stream Lifecycle Handler
   useEffect(() => {
-    if (!videoRef.current || !streamUrl || playerMode !== "native") return;
+    if (!videoRef.current || !streamUrl) return;
 
     const isHls = streamUrl.includes(".m3u8") || streamUrl.includes("/api/hls");
 
@@ -288,7 +255,7 @@ export default function VideoPlayer({
         hls.on(Hls.Events.ERROR, (_, errData) => {
           if (errData.fatal) {
             console.warn("HLS fatal error:", errData.type);
-            setPlayerMode("cloud");
+            setIsLoading(false);
           }
         });
       } else if (videoRef.current.canPlayType("application/vnd.apple.mpegurl")) {
@@ -301,7 +268,7 @@ export default function VideoPlayer({
       }
       videoRef.current.src = streamUrl;
     }
-  }, [streamUrl, isPlayingIntro, movie.id, profile.id, playerMode]);
+  }, [streamUrl, isPlayingIntro, movie.id, profile.id]);
 
   // 2. Fetch full episodes list if it's a TV series
   useEffect(() => {
@@ -339,7 +306,7 @@ export default function VideoPlayer({
     setIsPlayingIntro(false);
     const resumeTime = getMovieResumeTime(profile.id, movie.id);
     setTimeout(() => {
-      if (videoRef.current && playerMode === "native") {
+      if (videoRef.current) {
         if (resumeTime > 0) {
           try {
             videoRef.current.currentTime = resumeTime;
@@ -641,88 +608,72 @@ export default function VideoPlayer({
         /* 2. PLAYER VIEWPORT (NATIVE HTML5 OR CLOUD EMBED)             */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {playerMode === "cloud" ? (
-            /* Cloud Web Player (Zero buffer, works everywhere on Vercel) */
-            <div className="relative w-full h-full bg-black">
-              <iframe
-                src={getCloudStreamUrl()}
-                className="w-full h-full border-0"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-                allowFullScreen
-                referrerPolicy="origin"
-              />
-            </div>
-          ) : (
-            /* Native HTML5 Video Element with Full Subtitles */
-            <video
-              ref={videoRef}
-              onClick={togglePlay}
-              onTimeUpdate={handleTimeUpdate}
-              onWaiting={() => setIsLoading(true)}
-              onPlaying={() => {
-                setIsLoading(false);
-                setIsPlaying(true);
-              }}
-              onCanPlay={() => setIsLoading(false)}
-              onLoadedData={() => setIsLoading(false)}
-              onError={() => {
-                console.warn("Native player error — switching to Cloud Stream");
-                setPlayerMode("cloud");
-                setIsLoading(false);
-              }}
-              onEnded={() => {
-                if (isSeries) {
-                  setNextCountdown(5);
-                  const timer = setInterval(() => {
-                    setNextCountdown((prev) => {
-                      if (prev === 1) {
-                        clearInterval(timer);
-                        handleNextEpisode();
-                        return null;
-                      }
-                      return prev ? prev - 1 : null;
-                    });
-                  }, 1000);
-                } else {
-                  saveMovieProgress(profile.id, movie.id, duration, duration);
-                  onBack();
-                }
-              }}
-              className={`w-full h-full cursor-pointer transition-all duration-300 ${
-                aspectMode === "cover" ? "object-cover" : "object-contain"
-              }`}
-              preload="auto"
-              playsInline
-              crossOrigin="anonymous"
-            >
-              {/* Real OpenSubtitles tracks via FilmFlex Subtitle Proxy */}
-              <track
-                label="العربية (Arabic)"
-                kind="subtitles"
-                srcLang="ar"
-                src={`/api/subtitles?${subParams}&lang=ara`}
-                default={selectedSubtitle === "sub_ar"}
-              />
-              <track
-                label="Français (French)"
-                kind="subtitles"
-                srcLang="fr"
-                src={`/api/subtitles?${subParams}&lang=fre`}
-                default={selectedSubtitle === "sub_fr"}
-              />
-              <track
-                label="English [CC]"
-                kind="subtitles"
-                srcLang="en"
-                src={`/api/subtitles?${subParams}&lang=eng`}
-                default={selectedSubtitle === "sub_en"}
-              />
-            </video>
-          )}
+          {/* Native HTML5 Video Element with Full Subtitles & Torrentio */}
+          <video
+            ref={videoRef}
+            onClick={togglePlay}
+            onTimeUpdate={handleTimeUpdate}
+            onWaiting={() => setIsLoading(true)}
+            onPlaying={() => {
+              setIsLoading(false);
+              setIsPlaying(true);
+            }}
+            onCanPlay={() => setIsLoading(false)}
+            onLoadedData={() => setIsLoading(false)}
+            onError={() => {
+              setIsLoading(false);
+            }}
+            onEnded={() => {
+              if (isSeries) {
+                setNextCountdown(5);
+                const timer = setInterval(() => {
+                  setNextCountdown((prev) => {
+                    if (prev === 1) {
+                      clearInterval(timer);
+                      handleNextEpisode();
+                      return null;
+                    }
+                    return prev ? prev - 1 : null;
+                  });
+                }, 1000);
+              } else {
+                saveMovieProgress(profile.id, movie.id, duration, duration);
+                onBack();
+              }
+            }}
+            className={`w-full h-full cursor-pointer transition-all duration-300 ${
+              aspectMode === "cover" ? "object-cover" : "object-contain"
+            }`}
+            preload="auto"
+            playsInline
+            crossOrigin="anonymous"
+          >
+            {/* Real OpenSubtitles tracks via FilmFlex Subtitle Proxy */}
+            <track
+              label="العربية (Arabic)"
+              kind="subtitles"
+              srcLang="ar"
+              src={`/api/subtitles?${subParams}&lang=ara`}
+              default={selectedSubtitle === "sub_ar"}
+            />
+            <track
+              label="Français (French)"
+              kind="subtitles"
+              srcLang="fr"
+              src={`/api/subtitles?${subParams}&lang=fre`}
+              default={selectedSubtitle === "sub_fr"}
+            />
+            <track
+              label="English [CC]"
+              kind="subtitles"
+              srcLang="en"
+              src={`/api/subtitles?${subParams}&lang=eng`}
+              default={selectedSubtitle === "sub_en"}
+            />
+          </video>
 
-          {/* FilmFlex Loading Spinner */}
-          {isLoading && playerMode === "native" && (
+          {/* FilmFlex Loading Spinner with Stremio App Deep Link */}
+          {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
               <div className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-black/75 backdrop-blur-md border border-white/10 max-w-sm mx-4 text-center">
                 <div className="relative flex items-center justify-center">
@@ -732,17 +683,17 @@ export default function VideoPlayer({
                   </div>
                 </div>
                 <span className="text-xs text-neutral-300 font-mono tracking-wide">
-                  Chargement {selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}...
+                  Chargement flux Torrentio {selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}...
                 </span>
-                <button
-                  onClick={() => {
-                    setPlayerMode("cloud");
-                    setIsLoading(false);
-                  }}
-                  className="px-4 py-1.5 mt-1 bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold rounded-full shadow-lg pointer-events-auto transition-transform hover:scale-105"
-                >
-                  Passer au Serveur Cloud HD ⚡
-                </button>
+                {stremioAppUrl && (
+                  <a
+                    href={stremioAppUrl}
+                    className="px-4 py-1.5 mt-2 bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold rounded-full shadow-lg pointer-events-auto transition-transform hover:scale-105 flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Ouvrir dans Stremio</span>
+                  </a>
+                )}
               </div>
             </div>
           )}
@@ -836,81 +787,18 @@ export default function VideoPlayer({
                 </button>
               )}
 
-              {/* Server Switcher Pill */}
-              <div className="relative">
-                <button
-                  onClick={() => setActiveMenu(activeMenu === "server" ? null : "server")}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
-                    playerMode === "cloud"
-                      ? "bg-red-950/80 border-[#E50914] text-white shadow-[0_0_10px_rgba(229,9,20,0.5)]"
-                      : "bg-neutral-900/90 border-neutral-700 text-neutral-300 hover:border-neutral-500"
-                  }`}
-                  title="Changer de serveur"
+              {/* Open in Stremio App Deep Link Button */}
+              {stremioAppUrl && (
+                <a
+                  href={stremioAppUrl}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold transition-all shadow-lg hover:scale-105"
+                  title="Ouvrir directement dans l'application Stremio"
                 >
-                  <span className="w-2 h-2 rounded-full bg-[#E50914] animate-pulse" />
-                  <span>
-                    {playerMode === "cloud"
-                      ? cloudServer === "autoembed"
-                        ? "Serveur FilmFlex 2"
-                        : "Serveur FilmFlex 1"
-                      : "Serveur Direct"}
-                  </span>
-                </button>
-
-                {activeMenu === "server" && (
-                  <div className="absolute top-10 right-0 w-64 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-xl p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                    <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                      Serveurs de Diffusion FilmFlex
-                    </div>
-                    <button
-                      onClick={() => {
-                        setPlayerMode("cloud");
-                        setCloudServer("vidlink");
-                        setActiveMenu(null);
-                      }}
-                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur FilmFlex HD 1</span>
-                        <span className="text-[10px] text-neutral-400">Ultra rapide & fluide</span>
-                      </div>
-                      {playerMode === "cloud" && cloudServer === "vidlink" && (
-                        <Check className="w-4 h-4 text-[#E50914]" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPlayerMode("cloud");
-                        setCloudServer("autoembed");
-                        setActiveMenu(null);
-                      }}
-                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur FilmFlex HD 2</span>
-                        <span className="text-[10px] text-neutral-400">Multi-flux alternatif</span>
-                      </div>
-                      {playerMode === "cloud" && cloudServer === "autoembed" && (
-                        <Check className="w-4 h-4 text-[#E50914]" />
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPlayerMode("native");
-                        setIsLoading(true);
-                        setActiveMenu(null);
-                      }}
-                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur FilmFlex Direct</span>
-                        <span className="text-[10px] text-neutral-400">Flux haute fidélité original</span>
-                      </div>
-                      {playerMode === "native" && <Check className="w-4 h-4 text-[#E50914]" />}
-                    </button>
-                  </div>
-                )}
-              </div>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Ouvrir dans Stremio</span>
+                  <span className="sm:hidden">Stremio</span>
+                </a>
+              )}
 
               {/* Rotate Screen button: ONLY ON MOBILE (hidden on desktop md:hidden) */}
               <button
@@ -949,12 +837,11 @@ export default function VideoPlayer({
           {/* ============================================================ */}
           {/* BOTTOM CONTROLS BAR: Native Player Controls (FilmFlex Red)    */}
           {/* ============================================================ */}
-          {playerMode === "native" && (
-            <div
-              className={`absolute bottom-0 left-0 right-0 px-4 md:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col gap-2 transition-opacity duration-300 z-30 ${
-                showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-              }`}
-            >
+          <div
+            className={`absolute bottom-0 left-0 right-0 px-4 md:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col gap-2 transition-opacity duration-300 z-30 ${
+              showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
               {/* Scrubber Timeline Bar (Red) */}
               <div className="flex items-center gap-3 w-full">
                 <span className="text-[11px] font-mono text-neutral-400 w-14 text-right">
@@ -1162,7 +1049,6 @@ export default function VideoPlayer({
                 </div>
               </div>
             </div>
-          )}
 
           {/* ============================================================ */}
           {/* SLIDE-OVER EPISODES DRAWER INSIDE THE PLAYER                 */}
