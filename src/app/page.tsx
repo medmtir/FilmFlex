@@ -13,7 +13,10 @@ import AuthModal from "@/components/AuthModal";
 import ScreenLimitModal from "@/components/ScreenLimitModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
 import CategoryGridView from "@/components/CategoryGridView";
-import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass, User } from "lucide-react";
+import NetflixPreviewsRow from "@/components/NetflixPreviewsRow";
+import MobileMovieDetailsSheet from "@/components/MobileMovieDetailsSheet";
+import DownloadsView from "@/components/DownloadsView";
+import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass, User, Download, Search } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
 import {
   INITIAL_MOVIES,
@@ -431,26 +434,67 @@ export default function HomePage() {
         />
       )}
 
-      {/* 3. Search Results */}
-      {searchQuery.trim().length > 0 ? (
-        <main className="pt-28 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
+      {/* 2b. Previews Circular Avatars Row (Exact match to Screen 1) */}
+      {showBillboard && activeTab === "home" && !searchQuery && (
+        <NetflixPreviewsRow
+          movies={[
+            ...animeMovies.slice(0, 3),
+            ...tunisianMovies.slice(0, 3),
+            ...liveMovies.slice(0, 4),
+          ]}
+          onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+          onPlay={(m) => handlePlayMovie(m)}
+        />
+      )}
+
+      {/* 3. Search Screen / Results */}
+      {searchQuery.trim().length > 0 || activeTab === "search" ? (
+        <main className="pt-24 md:pt-28 pb-20 px-4 md:px-8 max-w-7xl mx-auto">
+          {activeTab === "search" && (
+            <div className="mb-6 relative">
+              <div className="flex items-center gap-3 bg-neutral-900/90 border border-neutral-700/80 rounded-2xl px-4 py-3.5 shadow-xl">
+                <Search className="w-5 h-5 text-[#E50914] shrink-0" />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Rechercher des films, séries, animés, cinéma tunisien..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="bg-transparent text-sm sm:text-base text-white placeholder-neutral-500 outline-none w-full"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="p-1 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white cursor-pointer text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl md:text-2xl font-bold text-neutral-300">
-              Résultats pour <span className="text-white">&ldquo;{searchQuery}&rdquo;</span>
+              {searchQuery ? (
+                <>Résultats pour <span className="text-white">&ldquo;{searchQuery}&rdquo;</span></>
+              ) : (
+                "Films et séries les plus recherchés"
+              )}
             </h2>
             {isSearching && (
               <span className="text-xs text-[#E50914] animate-pulse">Recherche sur FilmFlex...</span>
             )}
           </div>
 
-          {searchResults.length === 0 && !isSearching ? (
+          {(searchResults.length === 0 && searchQuery) && !isSearching ? (
             <div className="py-20 text-center text-neutral-500">
               <p className="text-lg">Aucun film ou série trouvé.</p>
               <p className="text-sm mt-1">Essayez un autre titre, anime ou film tunisien.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {searchResults.map((movie) => (
+              {(searchResults.length > 0 ? searchResults : liveMovies.slice(0, 15)).map((movie) => (
                 <div
                   key={movie.id}
                   onClick={() => setSelectedMovieForModal(movie)}
@@ -517,6 +561,15 @@ export default function HomePage() {
               myListIds={myListIds}
               onPlay={(m) => handlePlayMovie(m)}
               onToggleMyList={handleToggleMyList}
+              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+            />
+          )}
+
+          {/* DEDICATED DOWNLOADS TAB (Stremio & Netflix exact match) */}
+          {activeTab === "downloads" && (
+            <DownloadsView
+              movies={[...liveMovies, ...animeMovies, ...tunisianMovies]}
+              onPlay={(m) => handlePlayMovie(m)}
               onOpenModal={(movie) => setSelectedMovieForModal(movie)}
             />
           )}
@@ -698,15 +751,27 @@ export default function HomePage() {
         </main>
       )}
 
-      {/* 5. Movie Details Modal */}
-      <MovieModal
-        movie={selectedMovieForModal}
-        onClose={() => setSelectedMovieForModal(null)}
-        onPlay={(m, s, e) => handlePlayMovie(m, s, e)}
-        isInMyList={selectedMovieForModal ? myListIds.includes(selectedMovieForModal.id) : false}
-        onToggleMyList={handleToggleMyList}
-        allMovies={allAvailableMovies}
-      />
+      {/* 5. Movie Details Modal: Mobile Sheet (Exact match to Screen 2) & Desktop Modal */}
+      <div className="md:hidden">
+        <MobileMovieDetailsSheet
+          movie={selectedMovieForModal}
+          onClose={() => setSelectedMovieForModal(null)}
+          onPlay={(m, s, e) => handlePlayMovie(m, s, e)}
+          isInMyList={selectedMovieForModal ? myListIds.includes(selectedMovieForModal.id) : false}
+          onToggleMyList={handleToggleMyList}
+        />
+      </div>
+
+      <div className="hidden md:block">
+        <MovieModal
+          movie={selectedMovieForModal}
+          onClose={() => setSelectedMovieForModal(null)}
+          onPlay={(m, s, e) => handlePlayMovie(m, s, e)}
+          isInMyList={selectedMovieForModal ? myListIds.includes(selectedMovieForModal.id) : false}
+          onToggleMyList={handleToggleMyList}
+          allMovies={allAvailableMovies}
+        />
+      </div>
 
       {/* 6. Paywall & Subscription Modal */}
       <PaywallModal
@@ -790,13 +855,14 @@ export default function HomePage() {
       </footer>
 
       {/* 8. Mobile Bottom Navigation Bar (Dedicated Mobile App Layout) */}
+      {/* 8. Mobile Bottom Navigation Bar (Exact Match to Netflix Mobile App) */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e12]/95 backdrop-blur-2xl border-t border-neutral-800/90 px-1 py-1.5 flex items-center justify-around select-none shadow-[0_-10px_30px_rgba(0,0,0,0.9)] pb-[max(0.375rem,env(safe-area-inset-bottom))]">
         {[
           { id: "home", label: "Accueil", icon: Home },
+          { id: "search", label: "Recherche", icon: Search },
+          { id: "downloads", label: "Téléchargements", icon: Download, hasBadge: true },
           { id: "anime", label: "Animés 🎌", icon: Sparkles },
           { id: "tunisien", label: "Tunisien 🇹🇳", icon: Compass },
-          { id: "movies", label: "Films", icon: Film },
-          { id: "series", label: "Séries", icon: Tv },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id && !searchQuery;
@@ -805,10 +871,14 @@ export default function HomePage() {
               key={tab.id}
               onClick={() => {
                 setActiveTab(tab.id);
-                setSearchQuery("");
-                window.scrollTo({ top: 0, behavior: "smooth" });
+                if (tab.id === "search") {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                } else {
+                  setSearchQuery("");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }
               }}
-              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+              className={`flex flex-col items-center justify-center py-1 px-1.5 rounded-xl transition-all cursor-pointer ${
                 isActive ? "text-[#E50914] font-bold scale-105" : "text-neutral-400 hover:text-white"
               }`}
             >
@@ -817,8 +887,13 @@ export default function HomePage() {
                 {isActive && (
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E50914] shadow-[0_0_8px_#E50914]" />
                 )}
+                {tab.hasBadge && (
+                  <span className="absolute -top-1 -right-2 px-1 rounded-full bg-[#E50914] text-[9px] font-black text-white leading-tight">
+                    3
+                  </span>
+                )}
               </div>
-              <span className={`text-[10px] mt-1 font-medium truncate max-w-[60px] ${isActive ? "text-[#E50914] font-bold" : ""}`}>
+              <span className={`text-[9px] sm:text-[10px] mt-1 font-medium truncate max-w-[54px] ${isActive ? "text-[#E50914] font-bold" : ""}`}>
                 {tab.label}
               </span>
             </button>

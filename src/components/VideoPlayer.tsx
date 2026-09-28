@@ -40,16 +40,16 @@ interface ServerOption {
 
 const SERVER_OPTIONS: ServerOption[] = [
   {
-    id: "torrentio",
-    name: "Serveur 1 (Torrentio 4K Auto-Best)",
-    badge: "⭐ Défaut (Auto-Best)",
-    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p sans coupure",
+    id: "vidlink",
+    name: "Serveur 1 (Netflix Ultra HD)",
+    badge: "⭐ Défaut (Netflix)",
+    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR et streaming instantané sans coupure",
   },
   {
-    id: "vidlink",
-    name: "Serveur 2 (FilmFlex Ultra HD)",
-    badge: "VidLink 4K",
-    description: "Lecteur HD rapide avec sous-titres arabes et français",
+    id: "torrentio",
+    name: "Serveur 2 (Torrentio CDN 4K)",
+    badge: "Torrentio 4K",
+    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p",
   },
   {
     id: "vidsrc",
@@ -108,8 +108,8 @@ export default function VideoPlayer({
   const [episodesList, setEpisodesList] = useState<Episode[]>([]);
   const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
 
-  // Player state: Torrentio is the #1 DEFAULT server as requested by user
-  const [activeServer, setActiveServer] = useState<ServerType>("torrentio");
+  // Player state: VidLink (Netflix Ultra HD) is the #1 DEFAULT server with 0 sandbox errors & clean controls
+  const [activeServer, setActiveServer] = useState<ServerType>("vidlink");
   const [showServerMenu, setShowServerMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -152,6 +152,8 @@ export default function VideoPlayer({
   useEffect(() => {
     const handleOrientation = () => {
       if (typeof window !== "undefined" && window.innerWidth > window.innerHeight) {
+        setIsLandscapeMode(true);
+      } else {
         setIsLandscapeMode(false);
       }
     };
@@ -198,9 +200,11 @@ export default function VideoPlayer({
           if (typeof orient.unlock === "function") orient.unlock();
           setIsLandscapeMode(false);
         }
+      } else {
+        setIsLandscapeMode(!isLandscapeMode);
       }
     } catch {
-      // Fallback
+      setIsLandscapeMode(!isLandscapeMode);
     }
   };
 
@@ -281,17 +285,17 @@ export default function VideoPlayer({
 
   // Build stream URL according to selected server
   const getStreamUrl = () => {
+    if (activeServer === "vidlink") {
+      // Server 1 (DEFAULT): VidLink HD with customized Netflix red skin & Arabic/French subtitles
+      return isSeries
+        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
+        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
+    }
     if (activeServer === "torrentio") {
-      // Server 1 (DEFAULT): Torrentio 4K Auto-Best Stream Engine (VidSrc CC / Multi-Torrents CDN)
+      // Server 2: Torrentio 4K Auto-Best Stream Engine (VidSrc CC / Multi-Torrents CDN)
       return isSeries
         ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
         : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
-    }
-    if (activeServer === "vidlink") {
-      // Server 2: VidLink HD with customized Netflix red skin & Arabic/French subtitles
-      return isSeries
-        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`
-        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
     }
     if (activeServer === "vidsrc") {
       // Server 3: VidSrc.me high-speed mirror
@@ -313,7 +317,7 @@ export default function VideoPlayer({
 
   // 1-Click Auto-Best Switcher (Anti-Coupure)
   const handleAutoBestSwitch = () => {
-    const serverOrder: ServerType[] = ["torrentio", "vidlink", "vidsrc", "embed2", "embedsu"];
+    const serverOrder: ServerType[] = ["vidlink", "torrentio", "vidsrc", "embed2", "embedsu"];
     const currentIndex = serverOrder.indexOf(activeServer);
     const nextIndex = (currentIndex + 1) % serverOrder.length;
     const nextServer = serverOrder[nextIndex];
@@ -377,7 +381,6 @@ export default function VideoPlayer({
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             referrerPolicy="origin"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen"
           />
 
           {/* Resumed Notification Badge */}
@@ -432,38 +435,38 @@ export default function VideoPlayer({
             }`}
           >
             {/* Left: Back button & Title */}
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 pointer-events-auto">
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1 pr-2 pointer-events-auto">
               <button
                 onClick={onBack}
-                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 cursor-pointer"
+                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 cursor-pointer shrink-0"
                 title="Retour"
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-xs sm:text-base font-semibold tracking-wide text-neutral-100 truncate max-w-[130px] sm:max-w-md drop-shadow">
+              <h2 className="text-xs sm:text-base font-semibold tracking-wide text-neutral-100 truncate max-w-[150px] sm:max-w-md drop-shadow">
                 {movie.title}
                 {isSeries && ` (S${currentSeason} E${currentEpisode})`}
               </h2>
             </div>
 
             {/* Right: Controls & Server Switcher */}
-            <div className="flex items-center gap-2 sm:gap-3 pointer-events-auto">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 pointer-events-auto">
               {/* Episodes Drawer Toggle for Series */}
               {isSeries && (
                 <button
                   onClick={() => setShowEpisodesDrawer(!showEpisodesDrawer)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
+                  className="flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
                   title="Liste des épisodes"
                 >
                   <ListVideo className="w-3.5 h-3.5 text-[#E50914]" />
-                  <span>Épisodes</span>
+                  <span className="hidden sm:inline">Épisodes</span>
                 </button>
               )}
 
               {/* Anti-Coupure Quick Button (Auto-Best) */}
               <button
                 onClick={handleAutoBestSwitch}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold transition-all shadow-md shadow-[#E50914]/40 hover:scale-105 active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold transition-all shadow-md shadow-[#E50914]/40 hover:scale-105 active:scale-95 cursor-pointer"
                 title="Basculer instantanément sur le meilleur flux sans coupure"
               >
                 <Zap className="w-3.5 h-3.5 fill-white" />
@@ -474,19 +477,18 @@ export default function VideoPlayer({
               <div className="relative">
                 <button
                   onClick={() => setShowServerMenu(!showServerMenu)}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 text-neutral-200 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
+                  className="flex items-center gap-1 px-2 sm:px-3 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 text-neutral-200 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
                   title="Changer de serveur de streaming"
                 >
                   <Server className="w-3.5 h-3.5 text-[#E50914]" />
                   <span className="hidden sm:inline">{activeServerInfo.name}</span>
-                  <span className="sm:hidden font-mono">{activeServerInfo.badge}</span>
                 </button>
 
                 {showServerMenu && (
                   <div className="absolute top-11 right-0 w-72 bg-[#141414]/95 backdrop-blur-xl border border-neutral-800 rounded-2xl p-2.5 shadow-2xl z-50 animate-scale-up space-y-1">
                     <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800 flex items-center justify-between">
                       <span>Serveurs de Streaming</span>
-                      <span className="text-[10px] text-emerald-400">Torrentio Par Défaut</span>
+                      <span className="text-[10px] text-emerald-400">Netflix Ultra HD Par Défaut</span>
                     </div>
                     {SERVER_OPTIONS.map((srv) => (
                       <button
@@ -524,15 +526,15 @@ export default function VideoPlayer({
               {/* Rotate Screen button: ONLY VISIBLE ON MOBILE */}
               <button
                 onClick={toggleRotate}
-                className="flex md:hidden items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-[10px] font-semibold transition-all backdrop-blur-md shadow-lg"
+                className="flex md:hidden items-center gap-1 px-2 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-[10px] font-semibold transition-all backdrop-blur-md shadow-lg"
                 title="Tourner l'écran"
               >
                 <RotateCw className="w-3.5 h-3.5 text-[#E50914]" />
-                <span>{isLandscapeMode ? "Portrait" : "Paysage"}</span>
+                <span className="hidden sm:inline">{isLandscapeMode ? "Portrait" : "Paysage"}</span>
               </button>
 
-              {/* 1080P HD Badge */}
-              <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 text-neutral-200 border border-white/15 text-[10px] sm:text-xs font-mono font-semibold uppercase backdrop-blur-md shadow-lg">
+              {/* 4K UHD Badge (Desktop only) */}
+              <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/75 text-neutral-200 border border-white/15 text-xs font-mono font-semibold uppercase backdrop-blur-md shadow-lg">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 4K UHD
               </span>

@@ -33,7 +33,7 @@ export default function DownloadPage() {
         {/* Badge */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E50914]/20 text-[#ff4d58] border border-[#E50914]/40 mb-4 uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Application Android Officielle (v1.0.2)</span>
+          <span>Application Android Officielle (v1.0.3)</span>
         </div>
 
         <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight mb-3">
@@ -55,7 +55,7 @@ export default function DownloadPage() {
             <span>Télécharger l&apos;APK (FilmFlex.apk)</span>
           </a>
           <p className="text-[11px] text-neutral-500 font-mono">
-            Taille : ~4.6 Mo • Version : 1.0.2 • 100% Gratuit & Sécurisé
+            Taille : ~4.6 Mo • Version : 1.0.3 • 100% Gratuit & Sécurisé
           </p>
         </div>
 

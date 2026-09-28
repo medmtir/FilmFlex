@@ -20,6 +20,7 @@ export interface Episode {
   title: string;
   overview?: string;
   thumbnail?: string;
+  duration?: string;
 }
 
 export interface Movie {
