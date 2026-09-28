@@ -12,12 +12,19 @@ import AdminDashboard from "@/components/AdminDashboard";
 import AuthModal from "@/components/AuthModal";
 import ScreenLimitModal from "@/components/ScreenLimitModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
-import { Home, Film, Tv, Flame, Bookmark } from "lucide-react";
+import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
-import { INITIAL_MOVIES, INITIAL_SERIES, DEFAULT_PROFILES } from "@/lib/constants";
+import {
+  INITIAL_MOVIES,
+  INITIAL_SERIES,
+  DEFAULT_PROFILES,
+  TUNISIAN_MOVIES,
+  ANIME_MOVIES,
+} from "@/lib/constants";
 import {
   getStoredUser,
   saveUser,
+  clearUserSession,
   getProfileProgress,
   getMyList,
   toggleMyList as toggleMyListStorage,
@@ -29,7 +36,7 @@ import {
 } from "@/lib/supabase";
 
 export default function HomePage() {
-  // 1. User & Profiles State
+  // 1. User & Profiles State (Starts as null for clean Guest Mode)
   const [user, setUser] = useState<UserAccount | null>(null);
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
   const [showProfileGate, setShowProfileGate] = useState(false);
@@ -53,7 +60,7 @@ export default function HomePage() {
   const [progressList, setProgressList] = useState<WatchProgress[]>([]);
   const [myListIds, setMyListIds] = useState<string[]>([]);
 
-  // 5. Dynamic Stremio Movie State (Pre-filled with rich catalogs so rows are never empty)
+  // 5. Dynamic Catalogs (Stremio live + Tunisian + Anime)
   const [liveMovies, setLiveMovies] = useState<Movie[]>(INITIAL_MOVIES);
   const [actionMovies, setActionMovies] = useState<Movie[]>(() =>
     INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Action", "Adventure"].includes(g)))
@@ -68,32 +75,34 @@ export default function HomePage() {
     INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Comedy", "Animation", "Family"].includes(g)))
   );
   const [seriesMovies, setSeriesMovies] = useState<Movie[]>(INITIAL_SERIES);
+  const [tunisianMovies] = useState<Movie[]>(TUNISIAN_MOVIES);
+  const [animeMovies] = useState<Movie[]>(ANIME_MOVIES);
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Initialize from LocalStorage
+  // Initialize from LocalStorage (if logged in, load profile; if not, stay in Guest Mode)
   useEffect(() => {
     const stored = getStoredUser();
-    setUser(stored);
+    if (stored) {
+      setUser(stored);
+      const defaultProf =
+        stored.profiles.find((p) => p.id === stored.activeProfileId) || stored.profiles[0];
 
-    const defaultProf =
-      stored.profiles.find((p) => p.id === stored.activeProfileId) || stored.profiles[0];
-
-    if (defaultProf?.pinCode) {
-      setShowProfileGate(true);
-    } else {
-      setActiveProfile(defaultProf);
+      if (defaultProf?.pinCode) {
+        setShowProfileGate(true);
+      } else {
+        setActiveProfile(defaultProf);
+      }
     }
   }, []);
 
-  // Update profile data when active profile changes (LocalStorage + Supabase cloud sync)
+  // Update profile data when active profile changes
   useEffect(() => {
     if (activeProfile) {
       const localProgress = getProfileProgress(activeProfile.id);
       setProgressList(localProgress);
       setMyListIds(getMyList(activeProfile.id));
 
-      // Asynchronously sync with Supabase cloud
       fetchProgressFromSupabase(activeProfile.id)
         .then((remoteProgress) => {
           if (remoteProgress && remoteProgress.length > 0) {
@@ -114,7 +123,6 @@ export default function HomePage() {
 
   // Fetch Live Movies from Cinemeta
   useEffect(() => {
-    // 1. Top Movies
     fetch("/api/catalog")
       .then((res) => res.json())
       .then((data) => {
@@ -128,7 +136,6 @@ export default function HomePage() {
       })
       .catch((err) => console.error("Error fetching live catalog:", err));
 
-    // 2. Action
     fetch("/api/catalog?genre=Action")
       .then((res) => res.json())
       .then((data) => {
@@ -140,9 +147,8 @@ export default function HomePage() {
           });
         }
       })
-      .catch((err) => console.error(err));
+      .catch(() => {});
 
-    // 3. Sci-Fi
     fetch("/api/catalog?genre=Science%20Fiction")
       .then((res) => res.json())
       .then((data) => {
@@ -154,37 +160,8 @@ export default function HomePage() {
           });
         }
       })
-      .catch((err) => console.error(err));
+      .catch(() => {});
 
-    // 4. Thriller
-    fetch("/api/catalog?genre=Thriller")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.movies && data.movies.length > 0) {
-          setThrillerMovies((prev) => {
-            const map = new Map<string, Movie>();
-            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
-            return Array.from(map.values());
-          });
-        }
-      })
-      .catch((err) => console.error(err));
-
-    // 5. Comedy
-    fetch("/api/catalog?genre=Comedy")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.movies && data.movies.length > 0) {
-          setComedyMovies((prev) => {
-            const map = new Map<string, Movie>();
-            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
-            return Array.from(map.values());
-          });
-        }
-      })
-      .catch((err) => console.error(err));
-
-    // 6. Series
     fetch("/api/catalog?type=series")
       .then((res) => res.json())
       .then((data) => {
@@ -196,10 +173,10 @@ export default function HomePage() {
           });
         }
       })
-      .catch((err) => console.error(err));
+      .catch(() => {});
   }, []);
 
-  // Real-time Live Stremio Search
+  // Real-time Search combining local collections & Cinemeta
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -208,15 +185,33 @@ export default function HomePage() {
     }
 
     setIsSearching(true);
+    const query = searchQuery.trim().toLowerCase();
+
+    // Instant local matches (Tunisian, Anime, Blockbusters)
+    const localMatches = allAvailableMovies.filter(
+      (m) =>
+        m.title.toLowerCase().includes(query) ||
+        m.genres.some((g) => g.toLowerCase().includes(query)) ||
+        (m.cast && m.cast.some((c) => c.toLowerCase().includes(query)))
+    );
+
     const delayDebounce = setTimeout(() => {
       fetch(`/api/catalog?search=${encodeURIComponent(searchQuery.trim())}`)
         .then((res) => res.json())
         .then((data) => {
-          setSearchResults(data.movies || []);
+          const remoteMatches: Movie[] = data.movies || [];
+          const combined = new Map<string, Movie>();
+          for (const m of [...localMatches, ...remoteMatches]) {
+            if (m && m.id) combined.set(m.id, m);
+          }
+          setSearchResults(Array.from(combined.values()));
           setIsSearching(false);
         })
-        .catch(() => setIsSearching(false));
-    }, 350);
+        .catch(() => {
+          setSearchResults(localMatches);
+          setIsSearching(false);
+        });
+    }, 300);
 
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
@@ -241,8 +236,20 @@ export default function HomePage() {
     }
   };
 
+  const handleLogout = () => {
+    clearUserSession();
+    setUser(null);
+    setActiveProfile(null);
+    setShowProfileGate(false);
+    setShowAdminDashboard(false);
+    setProgressList([]);
+    setMyListIds([]);
+  };
+
   const handlePlayMovie = (movie: Movie, season = 1, episode = 1) => {
+    // Guest must login/subscribe before streaming
     if (!user) {
+      setSelectedMovieForModal(null);
       setShowAuthModal(true);
       return;
     }
@@ -271,6 +278,10 @@ export default function HomePage() {
   };
 
   const handleToggleMyList = (movie: Movie) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
     if (!activeProfile) return;
     toggleMyListStorage(activeProfile.id, movie.id);
     setMyListIds(getMyList(activeProfile.id));
@@ -296,6 +307,8 @@ export default function HomePage() {
   // Movies list pool - strictly unique
   const uniqueMoviesMap = new Map<string, Movie>();
   for (const m of [
+    ...tunisianMovies,
+    ...animeMovies,
     ...liveMovies,
     ...actionMovies,
     ...scifiMovies,
@@ -310,8 +323,8 @@ export default function HomePage() {
     }
   }
   const allAvailableMovies = Array.from(uniqueMoviesMap.values());
-  
-  // Continue Watching Movies - strictly unique, ordered by most recently watched
+
+  // Continue Watching Movies - strictly unique
   const continueWatchingMovies: Movie[] = [];
   const seenContinueIds = new Set<string>();
   for (const p of progressList) {
@@ -324,7 +337,7 @@ export default function HomePage() {
     }
   }
 
-  // My List Movies - strictly unique
+  // My List Movies
   const myListMovies: Movie[] = [];
   const seenMyListIds = new Set<string>();
   for (const id of myListIds) {
@@ -344,11 +357,8 @@ export default function HomePage() {
     top10Rank: idx + 1,
   }));
 
-  if (!user) {
-    return <div className="min-h-screen bg-[#141414]" />;
-  }
-
-  if (showProfileGate || !activeProfile) {
+  // Profile Gate is only shown if user is logged in and explicit gate requested
+  if (user && (showProfileGate || !activeProfile)) {
     return (
       <ProfileGate
         user={user}
@@ -358,6 +368,7 @@ export default function HomePage() {
     );
   }
 
+  // Active Video Player
   if (playingMovie) {
     return (
       <VideoPlayer
@@ -365,20 +376,32 @@ export default function HomePage() {
         profile={activeProfile}
         initialSeason={playerSeason}
         initialEpisode={playerEpisode}
-        userId={user.id}
+        userId={user?.id}
         onBack={() => {
           setPlayingMovie(null);
-          setProgressList(getProfileProgress(activeProfile.id));
+          if (activeProfile) {
+            setProgressList(getProfileProgress(activeProfile.id));
+          }
         }}
       />
     );
   }
 
-  const featuredMovie = liveMovies[0] || INITIAL_MOVIES[0];
+  // Featured Billboard Movie selection depending on active tab
+  let featuredMovie = liveMovies[0] || INITIAL_MOVIES[0];
+  if (activeTab === "series") {
+    featuredMovie = seriesMovies[0] || INITIAL_SERIES[0];
+  } else if (activeTab === "anime") {
+    featuredMovie = animeMovies[0]; // Attack on Titan
+  } else if (activeTab === "tunisien") {
+    featuredMovie = tunisianMovies[0]; // Dachra
+  }
+
+  const showBillboard = !searchQuery && ["home", "series", "anime", "tunisien"].includes(activeTab);
 
   return (
-    <div className="relative min-h-screen bg-[#141414] text-white overflow-x-hidden">
-      {/* 1. Navbar */}
+    <div className="relative min-h-screen bg-[#0e0e12] text-white overflow-x-hidden selection:bg-[#E50914] selection:text-white">
+      {/* 1. Header / Navbar */}
       <Navbar
         user={user}
         activeProfile={activeProfile}
@@ -386,6 +409,7 @@ export default function HomePage() {
         onOpenPaywall={() => setShowPaywall(true)}
         onOpenAdminDashboard={() => setShowAdminDashboard(true)}
         onOpenAuthModal={() => setShowAuthModal(true)}
+        onLogout={handleLogout}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         activeTab={activeTab}
@@ -395,16 +419,18 @@ export default function HomePage() {
         }}
       />
 
-      {/* 2. Main Hero Billboard (On Home and Series tabs) */}
-      {!searchQuery && (activeTab === "home" || activeTab === "series") && (
+      {/* 2. Hero Billboard Showcase (Rounded Card matching Image 2) */}
+      {showBillboard && (
         <Billboard
-          movie={activeTab === "series" ? (seriesMovies[0] || INITIAL_SERIES[0]) : featuredMovie}
+          movie={featuredMovie}
           onPlay={(m) => handlePlayMovie(m)}
           onMoreInfo={(movie) => setSelectedMovieForModal(movie)}
+          onToggleMyList={handleToggleMyList}
+          isInMyList={featuredMovie ? myListIds.includes(featuredMovie.id) : false}
         />
       )}
 
-      {/* 3. Live Stremio Search Results */}
+      {/* 3. Search Results */}
       {searchQuery.trim().length > 0 ? (
         <main className="pt-28 pb-16 px-4 md:px-8 max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
@@ -412,14 +438,14 @@ export default function HomePage() {
               Résultats pour <span className="text-white">&ldquo;{searchQuery}&rdquo;</span>
             </h2>
             {isSearching && (
-              <span className="text-xs text-[#E50914] animate-pulse">Recherche en direct sur FilmFlex...</span>
+              <span className="text-xs text-[#E50914] animate-pulse">Recherche sur FilmFlex...</span>
             )}
           </div>
 
           {searchResults.length === 0 && !isSearching ? (
             <div className="py-20 text-center text-neutral-500">
-              <p className="text-lg">Aucun film trouvé.</p>
-              <p className="text-sm mt-1">Essayez un autre titre, acteur ou genre.</p>
+              <p className="text-lg">Aucun film ou série trouvé.</p>
+              <p className="text-sm mt-1">Essayez un autre titre, anime ou film tunisien.</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -427,7 +453,7 @@ export default function HomePage() {
                 <div
                   key={movie.id}
                   onClick={() => setSelectedMovieForModal(movie)}
-                  className="group relative rounded-md overflow-hidden bg-neutral-900 cursor-pointer aspect-[2/3] border border-neutral-800 hover:border-neutral-500 transition-all hover:scale-105"
+                  className="group relative rounded-2xl overflow-hidden bg-neutral-900 cursor-pointer aspect-[2/3] border border-neutral-800 hover:border-neutral-500 transition-all hover:scale-105 shadow-lg"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -435,7 +461,7 @@ export default function HomePage() {
                     alt={movie.title}
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                     <span className="text-xs font-bold text-white leading-tight">{movie.title}</span>
                     <span className="text-[10px] text-neutral-400 mt-1">{movie.releaseYear} • {movie.quality}</span>
                   </div>
@@ -445,17 +471,15 @@ export default function HomePage() {
           )}
         </main>
       ) : (
-        /* 
-          4. Netflix Rows Catalogue:
-        */
+        /* 4. Main Rows Catalogue */
         <main
-          className={`relative z-20 pb-20 space-y-2 ${
-            activeTab === "home" || activeTab === "series" ? "-mt-10 md:-mt-24" : "pt-24 md:pt-32"
+          className={`relative z-20 pb-20 space-y-4 ${
+            showBillboard ? "pt-2" : "pt-24 md:pt-32"
           }`}
         >
-          {/* Page Title for Sub-tabs */}
-          {activeTab !== "home" && activeTab !== "series" && (
-            <div className="px-4 md:px-8 mb-4">
+          {/* Sub-tab Page Titles */}
+          {!showBillboard && (
+            <div className="px-4 md:px-8 mb-4 max-w-7xl mx-auto">
               <h1 className="text-2xl md:text-3xl font-extrabold text-white">
                 {activeTab === "movies" && "Films Populaires"}
                 {activeTab === "popular" && "Nouveautés & Plus Vus"}
@@ -464,12 +488,13 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* SÉRIES CATALOGUE TAB */}
-          {activeTab === "series" ? (
+          {/* DEDICATED ANIME TAB */}
+          {activeTab === "anime" && (
             <>
               <MovieRow
-                title="Séries Populaires & Plus Vues"
-                movies={seriesMovies}
+                title="Anime & Manga Japonais 🎌"
+                movies={animeMovies}
+                filterGenres={["Shonen", "Action", "Dark Fantasy", "Aventure", "Romance"]}
                 progressList={progressList}
                 myListIds={myListIds}
                 onPlay={(m) => handlePlayMovie(m)}
@@ -477,8 +502,9 @@ export default function HomePage() {
                 onOpenModal={(movie) => setSelectedMovieForModal(movie)}
               />
               <MovieRow
-                title="Séries Policières, Drames & Thrillers"
-                movies={seriesMovies.filter((s) => s.genres.some((g) => ["Crime", "Drama", "Thriller", "Action"].includes(g))).slice(0, 15)}
+                title="Séries Shonen & Combats Épiques"
+                movies={animeMovies.filter((a) => a.genres.includes("Shonen"))}
+                filterGenres={["Action", "Fantasy", "Supernatural"]}
                 progressList={progressList}
                 myListIds={myListIds}
                 onPlay={(m) => handlePlayMovie(m)}
@@ -486,8 +512,8 @@ export default function HomePage() {
                 onOpenModal={(movie) => setSelectedMovieForModal(movie)}
               />
               <MovieRow
-                title="Séries Science-Fiction, Fantastique & Aventure"
-                movies={seriesMovies.filter((s) => s.genres.some((g) => ["Sci-Fi", "Fantasy", "Horror", "Adventure"].includes(g))).slice(0, 15)}
+                title="Chefs-d'œuvre de l'Animation (Ghibli & Films)"
+                movies={animeMovies.filter((a) => a.type === "movie")}
                 progressList={progressList}
                 myListIds={myListIds}
                 onPlay={(m) => handlePlayMovie(m)}
@@ -495,13 +521,85 @@ export default function HomePage() {
                 onOpenModal={(movie) => setSelectedMovieForModal(movie)}
               />
             </>
-          ) : (
+          )}
+
+          {/* DEDICATED TUNISIAN CINEMA TAB */}
+          {activeTab === "tunisien" && (
             <>
-              {/* Continue Watching Row */}
-              {continueWatchingMovies.length > 0 && activeTab === "home" && (
+              <MovieRow
+                title="Cinéma Tunisien 🇹🇳 (Films & Séries Phares)"
+                movies={tunisianMovies}
+                filterGenres={["Comédie", "Drame", "Horreur", "Classique"]}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Comédies Tunisiennes Cultes"
+                movies={tunisianMovies.filter((t) => t.genres.includes("Comédie"))}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Drames Sociaux & Séries"
+                movies={tunisianMovies.filter((t) => t.genres.includes("Drame"))}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+            </>
+          )}
+
+          {/* DEDICATED SERIES TAB */}
+          {activeTab === "series" && (
+            <>
+              <MovieRow
+                title="Séries Populaires & Plus Vues"
+                movies={seriesMovies}
+                filterGenres={["Action", "Sci-Fi", "Drama", "Crime"]}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Séries Tunisiennes (Choufly Hal, Nouba...)"
+                movies={tunisianMovies.filter((t) => t.type === "series")}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Séries Anime Japonaises"
+                movies={animeMovies.filter((a) => a.type === "series")}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+            </>
+          )}
+
+          {/* HOME / MOVIES / POPULAR / MYLIST TAB */}
+          {["home", "movies", "popular", "mylist"].includes(activeTab) && (
+            <>
+              {/* Row 1: Trending Now with Image 2 Filter Pills */}
+              {(activeTab === "home" || activeTab === "popular") && (
                 <MovieRow
-                  title={`Reprendre la lecture (${activeProfile.name})`}
-                  movies={continueWatchingMovies}
+                  title="Trending Now"
+                  movies={liveMovies.slice(0, 14)}
+                  filterGenres={["Action", "Sci-Fi", "Comedy", "Thriller"]}
                   progressList={progressList}
                   myListIds={myListIds}
                   onPlay={(m) => handlePlayMovie(m)}
@@ -510,7 +608,63 @@ export default function HomePage() {
                 />
               )}
 
-              {/* My List */}
+              {/* Row 2: Cinéma Tunisien 🇹🇳 */}
+              {(activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Cinéma Tunisien 🇹🇳"
+                  movies={tunisianMovies}
+                  filterGenres={["Comédie", "Drame", "Horreur", "Classique"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Row 3: Anime & Manga 🎌 */}
+              {(activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Anime & Manga Japonais 🎌"
+                  movies={animeMovies}
+                  filterGenres={["Shonen", "Action", "Dark Fantasy", "Aventure"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Row 4: Continue Watching with Filter Pills (if progress exists) */}
+              {continueWatchingMovies.length > 0 && activeTab === "home" && (
+                <MovieRow
+                  title={`Continue Watching ${activeProfile ? `(${activeProfile.name})` : ""}`}
+                  movies={continueWatchingMovies}
+                  filterGenres={["Action", "Comedy", "Drama", "Thriller"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Row 5: FilmFlex Exclusives */}
+              {(activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="FilmFlex Exclusives"
+                  movies={actionMovies.slice(0, 12)}
+                  filterGenres={["Action", "Sci-Fi", "Comedy", "Thriller"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Row 6: My List (if bookmarked) */}
               {myListMovies.length > 0 && (activeTab === "home" || activeTab === "mylist") && (
                 <MovieRow
                   title="Ma Liste"
@@ -523,10 +677,10 @@ export default function HomePage() {
                 />
               )}
 
-              {/* Top 10 Movies Today in FilmFlex */}
+              {/* Row 7: Top 10 Today */}
               {top10Movies.length > 0 && (activeTab === "home" || activeTab === "popular") && (
                 <MovieRow
-                  title="Top 10 des films aujourd'hui sur FilmFlex"
+                  title="Top 10 aujourd'hui sur FilmFlex"
                   movies={top10Movies}
                   isTop10={true}
                   progressList={progressList}
@@ -537,50 +691,12 @@ export default function HomePage() {
                 />
               )}
 
-              {/* TV Series Row on Home Tab */}
-              {seriesMovies.length > 0 && activeTab === "home" && (
-                <MovieRow
-                  title="Séries Télévisées Populaires"
-                  movies={seriesMovies}
-                  progressList={progressList}
-                  myListIds={myListIds}
-                  onPlay={(m) => handlePlayMovie(m)}
-                  onToggleMyList={handleToggleMyList}
-                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-                />
-              )}
-
-              {/* Trending Now */}
-              {(activeTab === "home" || activeTab === "movies" || activeTab === "popular") && (
-                <MovieRow
-                  title="Tendances actuelles"
-                  movies={liveMovies.slice(10)}
-                  progressList={progressList}
-                  myListIds={myListIds}
-                  onPlay={(m) => handlePlayMovie(m)}
-                  onToggleMyList={handleToggleMyList}
-                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-                />
-              )}
-
-              {/* Action & Adventure */}
-              {actionMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
-                <MovieRow
-                  title="Action & Aventure"
-                  movies={actionMovies}
-                  progressList={progressList}
-                  myListIds={myListIds}
-                  onPlay={(m) => handlePlayMovie(m)}
-                  onToggleMyList={handleToggleMyList}
-                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-                />
-              )}
-
-              {/* Sci-Fi */}
+              {/* Row 8: Science-Fiction */}
               {scifiMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
                 <MovieRow
-                  title="Science-Fiction & Fantastique"
+                  title="Science-Fiction & Mondes Parallèles"
                   movies={scifiMovies}
+                  filterGenres={["Sci-Fi", "Fantasy", "Action"]}
                   progressList={progressList}
                   myListIds={myListIds}
                   onPlay={(m) => handlePlayMovie(m)}
@@ -589,37 +705,11 @@ export default function HomePage() {
                 />
               )}
 
-              {/* Thrillers, Suspense & Mystère */}
-              {thrillerMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
-                <MovieRow
-                  title="Thrillers, Suspense & Mystère"
-                  movies={thrillerMovies}
-                  progressList={progressList}
-                  myListIds={myListIds}
-                  onPlay={(m) => handlePlayMovie(m)}
-                  onToggleMyList={handleToggleMyList}
-                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-                />
-              )}
-
-              {/* Comedy */}
+              {/* Row 9: Comédies */}
               {comedyMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
                 <MovieRow
                   title="Comédies, Animation & Feel-Good"
                   movies={comedyMovies}
-                  progressList={progressList}
-                  myListIds={myListIds}
-                  onPlay={(m) => handlePlayMovie(m)}
-                  onToggleMyList={handleToggleMyList}
-                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-                />
-              )}
-
-              {/* Series Cultes */}
-              {seriesMovies.length > 5 && activeTab === "home" && (
-                <MovieRow
-                  title="Séries Cultes (HBO & Netflix)"
-                  movies={seriesMovies.slice(4)}
                   progressList={progressList}
                   myListIds={myListIds}
                   onPlay={(m) => handlePlayMovie(m)}
@@ -646,16 +736,26 @@ export default function HomePage() {
       <PaywallModal
         isOpen={showPaywall}
         onClose={() => setShowPaywall(false)}
-        user={user}
+        user={user || {
+          id: "guest",
+          email: "guest@filmflex.tv",
+          role: "user",
+          isSubscribed: false,
+          profiles: DEFAULT_PROFILES,
+          activeProfileId: "profile_1",
+          maxScreens: 2,
+        }}
         onSubscribe={handleSubscribe}
       />
 
-      {/* 6b. Admin Dashboard Modal (Abonnements & Écrans) */}
-      <AdminDashboard
-        isOpen={showAdminDashboard}
-        onClose={() => setShowAdminDashboard(false)}
-        currentUser={user}
-      />
+      {/* 6b. Admin Dashboard Modal */}
+      {user && (
+        <AdminDashboard
+          isOpen={showAdminDashboard}
+          onClose={() => setShowAdminDashboard(false)}
+          currentUser={user}
+        />
+      )}
 
       {/* 6c. Auth Modal (Connexion / Inscription) */}
       <AuthModal
@@ -669,26 +769,28 @@ export default function HomePage() {
         }}
       />
 
-      {/* 6d. Screen Limit Modal (Max 2 Écrans Simultanés) */}
-      <ScreenLimitModal
-        isOpen={showScreenLimitModal}
-        onClose={() => setShowScreenLimitModal(false)}
-        onRetry={() => {
-          setShowScreenLimitModal(false);
-          if (user && selectedMovieForModal) {
-            handlePlayMovie(selectedMovieForModal);
-          }
-        }}
-        activeCount={limitActiveScreens}
-        maxScreens={user.maxScreens || 2}
-      />
+      {/* 6d. Screen Limit Modal (Max 2 Screens) */}
+      {user && (
+        <ScreenLimitModal
+          isOpen={showScreenLimitModal}
+          onClose={() => setShowScreenLimitModal(false)}
+          onRetry={() => {
+            setShowScreenLimitModal(false);
+            if (user && selectedMovieForModal) {
+              handlePlayMovie(selectedMovieForModal);
+            }
+          }}
+          activeCount={limitActiveScreens}
+          maxScreens={user.maxScreens || 2}
+        />
+      )}
 
       {/* 7. Footer */}
-      <footer className="border-t border-neutral-800 bg-[#0e0e0e] py-12 px-4 md:px-8 text-neutral-500 text-xs">
+      <footer className="border-t border-neutral-800 bg-[#0a0a0d] py-12 px-4 md:px-8 text-neutral-500 text-xs select-none">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
             <FilmFlexLogo size="sm" />
-            <p className="text-neutral-400">Des questions ? Contactez le support FilmFlex VIP</p>
+            <p className="text-neutral-400">Support VIP FilmFlex • 4K Ultra HD Streaming</p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4">
@@ -696,8 +798,8 @@ export default function HomePage() {
             <span className="hover:underline cursor-pointer">Conditions d&apos;utilisation</span>
             <span className="hover:underline cursor-pointer">Confidentialité</span>
             <span className="hover:underline cursor-pointer">Préférences de cookies</span>
-            <span className="hover:underline cursor-pointer">Relations Investisseurs</span>
-            <span className="hover:underline cursor-pointer">Mentions légales</span>
+            <span className="hover:underline cursor-pointer">Cinéma Tunisien</span>
+            <span className="hover:underline cursor-pointer">Anime Japonais</span>
             <span className="hover:underline cursor-pointer">Test de vitesse</span>
             <span className="hover:underline cursor-pointer">Garantie 4K Ultra HD</span>
           </div>
@@ -711,14 +813,15 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* 8. Mobile Bottom Navigation Bar (Netflix Mobile App Style) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 backdrop-blur-lg border-t border-neutral-800/80 px-2 py-1.5 flex items-center justify-around">
+      {/* 8. Mobile Bottom Navigation Bar */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e12]/95 backdrop-blur-lg border-t border-neutral-800/80 px-2 py-1.5 flex items-center justify-around">
         {[
-          { id: "home", label: "Accueil", icon: Home },
-          { id: "movies", label: "Films", icon: Film },
-          { id: "series", label: "Séries", icon: Tv },
-          { id: "popular", label: "Nouveautés", icon: Flame },
-          { id: "mylist", label: "Ma Liste", icon: Bookmark },
+          { id: "home", label: "Home", icon: Home },
+          { id: "movies", label: "Movies", icon: Film },
+          { id: "series", label: "TV", icon: Tv },
+          { id: "anime", label: "Anime", icon: Sparkles },
+          { id: "tunisien", label: "Tunisien", icon: Compass },
+          { id: "mylist", label: "List", icon: Bookmark },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id && !searchQuery;
@@ -730,7 +833,7 @@ export default function HomePage() {
                 setSearchQuery("");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-all ${
+              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
                 isActive ? "text-white" : "text-neutral-500 hover:text-neutral-300"
               }`}
             >
@@ -740,7 +843,7 @@ export default function HomePage() {
                   <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#E50914]" />
                 )}
               </div>
-              <span className={`text-[10px] mt-1 font-medium ${isActive ? "text-white font-bold" : ""}`}>
+              <span className={`text-[10px] mt-0.5 font-medium ${isActive ? "text-white font-bold" : ""}`}>
                 {tab.label}
               </span>
             </button>

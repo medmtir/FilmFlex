@@ -21,14 +21,14 @@ import { startWatchingSession, stopWatchingSession } from "@/lib/auth";
 
 interface VideoPlayerProps {
   movie: Movie;
-  profile: Profile;
+  profile?: Profile | null;
   onBack: () => void;
   initialSeason?: number;
   initialEpisode?: number;
   userId?: string;
 }
 
-type ServerType = "server1" | "server2" | "server3";
+type ServerType = "server1" | "server2" | "server3" | "server4" | "server5";
 
 interface ServerOption {
   id: ServerType;
@@ -40,21 +40,33 @@ interface ServerOption {
 const SERVER_OPTIONS: ServerOption[] = [
   {
     id: "server1",
-    name: "Serveur FilmFlex 1",
-    badge: "Ultra HD",
-    description: "Lecteur HD rapide avec sous-titres arabes/français",
+    name: "Serveur 1 (FilmFlex Ultra HD)",
+    badge: "4K / Subtitles",
+    description: "Lecteur HD rapide avec sous-titres arabes et français",
   },
   {
     id: "server2",
-    name: "Serveur FilmFlex 2",
-    badge: "Pro Backup",
-    description: "Serveur mondial haute vitesse",
+    name: "Serveur 2 (Torrentio / VidSrc CC)",
+    badge: "Torrentio 4K",
+    description: "Flux Torrentio haute vitesse avec multi-pistes audio",
   },
   {
     id: "server3",
-    name: "Serveur FilmFlex 3",
-    badge: "Fast SD/HD",
-    description: "Alternative fluide pour connexion mobile 4G",
+    name: "Serveur 3 (FilmFlex VidSrc Pro)",
+    badge: "Mondial",
+    description: "Serveur mondial direct très fluide",
+  },
+  {
+    id: "server4",
+    name: "Serveur 4 (FilmFlex 2Embed)",
+    badge: "Backup HD",
+    description: "Alternative stable pour séries et animés",
+  },
+  {
+    id: "server5",
+    name: "Serveur 5 (FilmFlex Embed.su)",
+    badge: "Multi-Langues",
+    description: "Sous-titres multi-langues et streaming instantané",
   },
 ];
 
@@ -109,20 +121,22 @@ export default function VideoPlayer({
 
   // Save progress for "Reprendre la lecture"
   useEffect(() => {
-    const resumeTime = getMovieResumeTime(profile.id, movie.id);
+    const resumeTime = profile ? getMovieResumeTime(profile.id, movie.id) : 0;
     if (resumeTime > 0) {
       const mins = Math.floor(resumeTime / 60);
       setResumedNotice(`Reprise automatique à ${mins} min`);
       setTimeout(() => setResumedNotice(null), 4000);
     }
     // Update progress entry so movie appears in continue watching
-    saveMovieProgress(
-      profile.id,
-      movie.id,
-      resumeTime > 0 ? resumeTime : 180,
-      movie.durationSeconds || 7200
-    );
-  }, [profile.id, movie.id]);
+    if (profile) {
+      saveMovieProgress(
+        profile.id,
+        movie.id,
+        resumeTime > 0 ? resumeTime : 180,
+        movie.durationSeconds || 7200
+      );
+    }
+  }, [profile, movie.id, movie.durationSeconds]);
 
   // Mobile orientation handling
   useEffect(() => {
@@ -265,22 +279,36 @@ export default function VideoPlayer({
         : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
     }
     if (activeServer === "server2") {
-      // Server 2: VidSrc.me high-speed mirror
+      // Server 2: VidSrc CC (Torrentio / Stremio engine with multi-audio & multi-subtitles)
+      return isSeries
+        ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
+        : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
+    }
+    if (activeServer === "server3") {
+      // Server 3: VidSrc.me high-speed mirror
       return isSeries
         ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
         : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
     }
-    // Server 3: 2Embed fast alternative
+    if (activeServer === "server4") {
+      // Server 4: 2Embed fast alternative
+      return isSeries
+        ? `https://2embed.cc/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://2embed.cc/embed/${imdbId}`;
+    }
+    // Server 5: Embed.su Multi-Language Player
     return isSeries
-      ? `https://2embed.cc/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
-      : `https://2embed.cc/embed/${imdbId}`;
+      ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+      : `https://embed.su/embed/movie/${imdbId}`;
   };
 
   const handleSelectEpisode = (ep: Episode) => {
     setCurrentSeason(ep.season);
     setCurrentEpisode(ep.episode);
     setShowEpisodesDrawer(false);
-    saveMovieProgress(profile.id, movie.id, 60, movie.durationSeconds || 7200);
+    if (profile) {
+      saveMovieProgress(profile.id, movie.id, 60, movie.durationSeconds || 7200);
+    }
   };
 
   const currentSeasonEpisodes = episodesList.filter((e) => e.season === currentSeason);

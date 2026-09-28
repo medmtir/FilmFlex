@@ -11,43 +11,15 @@ const USER_STORAGE_KEY = "filmflex_user_session";
 const PROGRESS_STORAGE_PREFIX = "filmflex_progress_";
 const MY_LIST_STORAGE_PREFIX = "filmflex_mylist_";
 
-export function getStoredUser(): UserAccount {
+export function getStoredUser(): UserAccount | null {
   if (typeof window === "undefined") {
-    return {
-      id: "usr_vip_client",
-      email: "subscriber@filmflex.tv",
-      role: "user",
-      name: "Client VIP",
-      isSubscribed: true,
-      subscriptionPlan: "VIP_MONTHLY",
-      subscriptionStatus: "active",
-      subscriptionStartedAt: new Date().toISOString(),
-      subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      profiles: DEFAULT_PROFILES,
-      activeProfileId: DEFAULT_PROFILES[0].id,
-      maxScreens: 2,
-    };
+    return null;
   }
 
   try {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
     if (!raw) {
-      const initial: UserAccount = {
-        id: "usr_vip_client",
-        email: "subscriber@filmflex.tv",
-        role: "user",
-        name: "Client VIP",
-        isSubscribed: true,
-        subscriptionPlan: "VIP_MONTHLY",
-        subscriptionStatus: "active",
-        subscriptionStartedAt: new Date().toISOString(),
-        subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        profiles: DEFAULT_PROFILES,
-        activeProfileId: DEFAULT_PROFILES[0].id,
-        maxScreens: 2,
-      };
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(initial));
-      return initial;
+      return null;
     }
     const parsed: UserAccount = JSON.parse(raw);
     const validated = checkSubscriptionValidity(parsed);
@@ -56,20 +28,13 @@ export function getStoredUser(): UserAccount {
     }
     return validated;
   } catch {
-    return {
-      id: "usr_vip_client",
-      email: "subscriber@filmflex.tv",
-      role: "user",
-      name: "Client VIP",
-      isSubscribed: true,
-      subscriptionPlan: "VIP_MONTHLY",
-      subscriptionStatus: "active",
-      subscriptionStartedAt: new Date().toISOString(),
-      subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      profiles: DEFAULT_PROFILES,
-      activeProfileId: DEFAULT_PROFILES[0].id,
-      maxScreens: 2,
-    };
+    return null;
+  }
+}
+
+export function clearUserSession(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(USER_STORAGE_KEY);
   }
 }
 
@@ -83,8 +48,9 @@ export function saveUser(user: UserAccount): void {
 }
 
 // Profile management (Strict Max 2 Profiles)
-export function updateProfile(profileId: string, updates: Partial<Profile>): UserAccount {
+export function updateProfile(profileId: string, updates: Partial<Profile>): UserAccount | null {
   const user = getStoredUser();
+  if (!user) return null;
   user.profiles = user.profiles.map((p) => (p.id === profileId ? { ...p, ...updates } : p));
   saveUser(user);
 
@@ -96,8 +62,9 @@ export function updateProfile(profileId: string, updates: Partial<Profile>): Use
   return user;
 }
 
-export function setActiveProfile(profileId: string): UserAccount {
+export function setActiveProfile(profileId: string): UserAccount | null {
   const user = getStoredUser();
+  if (!user) return null;
   user.activeProfileId = profileId;
   saveUser(user);
   return user;
