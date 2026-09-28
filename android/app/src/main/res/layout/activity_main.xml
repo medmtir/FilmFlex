@@ -4,15 +4,94 @@
     android:layout_height="match_parent"
     android:background="#0e0e12">
 
+    <!-- Main Native Web View container -->
     <WebView
         android:id="@+id/webview"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:overScrollMode="never" />
 
+    <!-- Fullscreen Video Container for HTML5 & Torrentio Video Player -->
     <FrameLayout
         android:id="@+id/customViewContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:visibility="gone"
         android:background="#000000" />
+
+    <!-- Native Splash Screen (Appears immediately on launch like Netflix) -->
+    <RelativeLayout
+        android:id="@+id/splashContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0e0e12"
+        android:gravity="center">
+
+        <ImageView
+            android:id="@+id/splashLogo"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/splash_logo"
+            android:contentDescription="FilmFlex" />
+
+        <ProgressBar
+            android:id="@+id/splashProgress"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_below="@id/splashLogo"
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="28dp"
+            android:indeterminateTint="#E50914" />
+    </RelativeLayout>
+
+    <!-- Sleek Offline Error Overlay (Netflix style) -->
+    <LinearLayout
+        android:id="@+id/offlineContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0e0e12"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/splash_logo"
+            android:contentDescription="FilmFlex"
+            android:alpha="0.8" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Pas de connexion Internet"
+            android:textColor="#ffffff"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="Vérifiez votre connexion Wi-Fi ou données mobiles puis réessayez."
+            android:textColor="#999999"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btnRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:background="#E50914"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
+            android:text="Réessayer"
+            android:textColor="#ffffff"
+            android:textStyle="bold" />
+    </LinearLayout>
+
 </FrameLayout>
