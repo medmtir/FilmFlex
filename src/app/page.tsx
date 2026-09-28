@@ -45,11 +45,20 @@ export default function HomePage() {
   const [progressList, setProgressList] = useState<WatchProgress[]>([]);
   const [myListIds, setMyListIds] = useState<string[]>([]);
 
-  // 5. Dynamic Stremio Movie State
+  // 5. Dynamic Stremio Movie State (Pre-filled with rich catalogs so rows are never empty)
   const [liveMovies, setLiveMovies] = useState<Movie[]>(INITIAL_MOVIES);
-  const [actionMovies, setActionMovies] = useState<Movie[]>([]);
-  const [scifiMovies, setScifiMovies] = useState<Movie[]>([]);
-  const [comedyMovies, setComedyMovies] = useState<Movie[]>([]);
+  const [actionMovies, setActionMovies] = useState<Movie[]>(() =>
+    INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Action", "Adventure"].includes(g)))
+  );
+  const [scifiMovies, setScifiMovies] = useState<Movie[]>(() =>
+    INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Sci-Fi", "Fantasy", "Mondes Parallèles"].includes(g)))
+  );
+  const [thrillerMovies, setThrillerMovies] = useState<Movie[]>(() =>
+    INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Thriller", "Crime", "Mystery", "Drama"].includes(g)))
+  );
+  const [comedyMovies, setComedyMovies] = useState<Movie[]>(() =>
+    INITIAL_MOVIES.filter((m) => m.genres.some((g) => ["Comedy", "Animation", "Family"].includes(g)))
+  );
   const [seriesMovies, setSeriesMovies] = useState<Movie[]>(INITIAL_SERIES);
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -102,7 +111,11 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.movies && data.movies.length > 0) {
-          setLiveMovies(data.movies);
+          setLiveMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
         }
       })
       .catch((err) => console.error("Error fetching live catalog:", err));
@@ -112,7 +125,11 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.movies && data.movies.length > 0) {
-          setActionMovies(data.movies);
+          setActionMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
         }
       })
       .catch((err) => console.error(err));
@@ -122,27 +139,53 @@ export default function HomePage() {
       .then((res) => res.json())
       .then((data) => {
         if (data.movies && data.movies.length > 0) {
-          setScifiMovies(data.movies);
+          setScifiMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
         }
       })
       .catch((err) => console.error(err));
 
-    // 4. Comedy
+    // 4. Thriller
+    fetch("/api/catalog?genre=Thriller")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.movies && data.movies.length > 0) {
+          setThrillerMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch((err) => console.error(err));
+
+    // 5. Comedy
     fetch("/api/catalog?genre=Comedy")
       .then((res) => res.json())
       .then((data) => {
         if (data.movies && data.movies.length > 0) {
-          setComedyMovies(data.movies);
+          setComedyMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
         }
       })
       .catch((err) => console.error(err));
 
-    // 5. Series
+    // 6. Series
     fetch("/api/catalog?type=series")
       .then((res) => res.json())
       .then((data) => {
         if (data.movies && data.movies.length > 0) {
-          setSeriesMovies(data.movies);
+          setSeriesMovies((prev) => {
+            const map = new Map<string, Movie>();
+            for (const m of [...data.movies, ...prev]) map.set(m.id, m);
+            return Array.from(map.values());
+          });
         }
       })
       .catch((err) => console.error(err));
@@ -231,6 +274,7 @@ export default function HomePage() {
     ...liveMovies,
     ...actionMovies,
     ...scifiMovies,
+    ...thrillerMovies,
     ...comedyMovies,
     ...seriesMovies,
     ...INITIAL_MOVIES,
@@ -517,11 +561,37 @@ export default function HomePage() {
                 />
               )}
 
+              {/* Thrillers, Suspense & Mystère */}
+              {thrillerMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Thrillers, Suspense & Mystère"
+                  movies={thrillerMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
               {/* Comedy */}
               {comedyMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
                 <MovieRow
-                  title="Comédies & Feel-Good"
+                  title="Comédies, Animation & Feel-Good"
                   movies={comedyMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Series Cultes */}
+              {seriesMovies.length > 5 && activeTab === "home" && (
+                <MovieRow
+                  title="Séries Cultes (HBO & Netflix)"
+                  movies={seriesMovies.slice(4)}
                   progressList={progressList}
                   myListIds={myListIds}
                   onPlay={(m) => handlePlayMovie(m)}

@@ -2,7 +2,7 @@ export interface SubtitleTrack {
   id: string;
   label: string;
   language: string;
-  src: string;
+  src?: string;
   isDefault?: boolean;
 }
 

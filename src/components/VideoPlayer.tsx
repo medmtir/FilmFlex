@@ -15,7 +15,7 @@ import {
   MessageSquare,
   Sliders,
   PictureInPicture2,
-  Tv,
+  Cast,
   ListVideo,
   ChevronRight,
   Check,
@@ -23,9 +23,9 @@ import {
   Loader2,
   X,
   Settings2,
-  Zap,
   RotateCw,
-  Scaling,
+  ExternalLink,
+  Tv,
 } from "lucide-react";
 import { Movie, Profile, Episode } from "@/types";
 import { saveMovieProgress, getMovieResumeTime } from "@/lib/storage";
@@ -80,42 +80,53 @@ export default function VideoPlayer({
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [castNotice, setCastNotice] = useState<string | null>(null);
 
-  // Stream & Quality state
+  // Streaming Engine & Server Mode ("native" HTML5/Stremio vs "cloud" Web Stream)
+  const [playerMode, setPlayerMode] = useState<"native" | "cloud">("native");
+  const [cloudServer, setCloudServer] = useState<"vidlink" | "vidsrc" | "embedsu">("vidlink");
   const [streamUrl, setStreamUrl] = useState<string>("");
-  const fallbackAttemptsRef = useRef<number>(0);
   const [stremioAppUrl, setStremioAppUrl] = useState<string>("");
-  const [qualityMap, setQualityMap] = useState<Record<string, string>>({});
+
+  // Quality & Subtitles
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
+  const [qualityMap, setQualityMap] = useState<Record<string, string>>({});
   const [availableQualities, setAvailableQualities] = useState<QualityOption[]>([
     { key: "auto", label: "Auto (S'adapte à la connexion)" },
-    { key: "1080p", label: "1080p Full HD" },
-    { key: "720p", label: "720p HD (Fluide & Économique)" },
-    { key: "480p", label: "480p SD (Connexion faible)" },
-    { key: "4k", label: "4K Ultra HD" },
+    { key: "1080p", label: "1080p Full HD (Fluide)" },
+    { key: "720p", label: "720p HD (Rapide)" },
+    { key: "480p", label: "480p SD (Faible débit)" },
   ]);
-
-  // Mobile orientation & aspect-ratio states
-  const [isLandscapeMode, setIsLandscapeMode] = useState<boolean>(false);
-  const [aspectMode, setAspectMode] = useState<"contain" | "cover">("contain");
-
-  // Menus
-  const [activeMenu, setActiveMenu] = useState<"quality" | "speed" | "subtitles" | "audio" | null>(null);
-  const [selectedSubtitle, setSelectedSubtitle] = useState<string>("sub_ar");
+  const [selectedSubtitle, setSelectedSubtitle] = useState<string>("sub_ar"); // Default Arabic
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-
-  // Auto-next episode countdown state
+  const [aspectMode] = useState<"contain" | "cover">("contain");
+  const [activeMenu, setActiveMenu] = useState<"quality" | "subtitles" | "audio" | "speed" | "server" | null>(null);
   const [nextCountdown, setNextCountdown] = useState<number | null>(null);
-  const [showFastSwitch, setShowFastSwitch] = useState<boolean>(false);
-  const networkErrorsRef = useRef<number>(0);
+  const [isLandscapeMode, setIsLandscapeMode] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nativeWatchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
 
-  // Auto-request landscape and orientation handling for mobile
+  // Cloud Stream URL Builder
+  const getCloudStreamUrl = (server = cloudServer) => {
+    if (server === "vidlink") {
+      return isSeries
+        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+        : `https://vidlink.pro/movie/${imdbId}`;
+    }
+    if (server === "vidsrc") {
+      return isSeries
+        ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
+    }
+    return isSeries
+      ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+      : `https://embed.su/embed/movie/${imdbId}`;
+  };
+
+  // Mobile orientation handling
   useEffect(() => {
     const handleOrientation = () => {
       if (typeof window !== "undefined" && window.innerWidth > window.innerHeight) {
-        // Device is already physically in landscape, no CSS rotation needed
         setIsLandscapeMode(false);
       }
     };
@@ -146,7 +157,7 @@ export default function VideoPlayer({
     };
   }, []);
 
-  // Mobile-only toggle rotate (Screen Orientation API + CSS transform fallback)
+  // Mobile-only toggle rotate
   const toggleRotate = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 768) return;
 
@@ -155,9 +166,7 @@ export default function VideoPlayer({
       const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
       if (orient && typeof orient.lock === "function") {
         if (!isLandscapeMode) {
-          orient.lock("landscape").then(() => {
-            // Screen rotated natively
-          }).catch(() => {
+          orient.lock("landscape").then(() => {}).catch(() => {
             setIsLandscapeMode(true);
           });
           return;
@@ -171,46 +180,28 @@ export default function VideoPlayer({
     setIsLandscapeMode((prev) => !prev);
   };
 
-  // Reload or switch to alternative quality stream
-  const handleFastSwitch = () => {
-    setShowFastSwitch(false);
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-    const nextStream = qualityMap["720p"] || qualityMap["1080p"] || Object.values(qualityMap)[0];
-    if (nextStream && nextStream !== streamUrl) {
-      setIsLoading(true);
-      setStreamUrl(nextStream);
-      if (videoRef.current) {
-        videoRef.current.src = nextStream;
-        videoRef.current.load();
-        videoRef.current.play().catch(() => {});
-      }
-    } else if (videoRef.current) {
-      setIsLoading(true);
-      videoRef.current.load();
-      videoRef.current.play().catch(() => {});
-    }
-  };
-
-  // Watchdog timer: show reload option if buffering takes > 5s
+  // Watchdog: If native HTML5 video stays loading or black for > 3.5s (e.g. on Vercel without Stremio), switch to Cloud Player
   useEffect(() => {
-    let warnTimer: NodeJS.Timeout;
-    if (isLoading && !isPlayingIntro) {
-      warnTimer = setTimeout(() => {
-        setShowFastSwitch(true);
-      }, 5000);
+    if (isLoading && !isPlayingIntro && playerMode === "native") {
+      if (nativeWatchdogTimerRef.current) clearTimeout(nativeWatchdogTimerRef.current);
+      nativeWatchdogTimerRef.current = setTimeout(() => {
+        console.info("Native stream timeout — seamlessly switching to Cloud HD Server");
+        setPlayerMode("cloud");
+        setIsLoading(false);
+      }, 3500);
     } else {
-      setShowFastSwitch(false);
+      if (nativeWatchdogTimerRef.current) {
+        clearTimeout(nativeWatchdogTimerRef.current);
+        nativeWatchdogTimerRef.current = null;
+      }
     }
 
     return () => {
-      clearTimeout(warnTimer);
+      if (nativeWatchdogTimerRef.current) clearTimeout(nativeWatchdogTimerRef.current);
     };
-  }, [isLoading, isPlayingIntro]);
+  }, [isLoading, isPlayingIntro, playerMode]);
 
-  // Prevent browser media exceptions from triggering Next.js runtime error overlay
+  // Prevent browser media exceptions from breaking UI
   useEffect(() => {
     const handleRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason;
@@ -225,6 +216,7 @@ export default function VideoPlayer({
       ) {
         event.preventDefault();
         event.stopPropagation();
+        setPlayerMode("cloud");
         setIsLoading(false);
       }
     };
@@ -235,8 +227,6 @@ export default function VideoPlayer({
   // 1. Fetch live stream and qualities
   useEffect(() => {
     setIsLoading(true);
-    fallbackAttemptsRef.current = 0;
-    networkErrorsRef.current = 0;
     const search = new URLSearchParams();
     if (isSeries) {
       search.set("season", currentSeason.toString());
@@ -260,12 +250,15 @@ export default function VideoPlayer({
           setAvailableQualities(data.availableQualities);
         }
       })
-      .catch((err) => console.error("Stream resolution error:", err));
+      .catch((err) => {
+        console.error("Stream resolution error:", err);
+        setPlayerMode("cloud");
+      });
   }, [imdbId, isSeries, currentSeason, currentEpisode, selectedQuality]);
 
   // 1b. HLS / Video Stream Lifecycle Handler
   useEffect(() => {
-    if (!videoRef.current || !streamUrl) return;
+    if (!videoRef.current || !streamUrl || playerMode !== "native") return;
 
     const isHls = streamUrl.includes(".m3u8") || streamUrl.includes("/api/hls");
 
@@ -289,7 +282,6 @@ export default function VideoPlayer({
 
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
           setIsLoading(false);
-          setShowFastSwitch(false);
           if (!isPlayingIntro && videoRef.current) {
             const resumeTime = getMovieResumeTime(profile.id, movie.id);
             if (resumeTime > 0) {
@@ -297,46 +289,16 @@ export default function VideoPlayer({
                 videoRef.current.currentTime = resumeTime;
               } catch {}
             }
-            const p = videoRef.current.play();
-            if (p !== undefined) {
-              p.then(() => setIsPlaying(true)).catch(() => {});
-            }
+            videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
           }
         });
 
-        hls.on(Hls.Events.ERROR, (_, data) => {
-          if (data.fatal) {
-            networkErrorsRef.current += 1;
-            if (networkErrorsRef.current >= 2) {
-              console.warn("HLS fatal retry limit reached, switching to direct smooth playback");
-              handleFastSwitch();
-              return;
-            }
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.warn("HLS network error, retrying...");
-                hls.startLoad();
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.warn("HLS media error, recovering...");
-                hls.recoverMediaError();
-                break;
-              default:
-                console.warn("HLS fatal error:", data);
-                hls.destroy();
-                hlsRef.current = null;
-                handleFastSwitch();
-                break;
-            }
+        hls.on(Hls.Events.ERROR, (_, errData) => {
+          if (errData.fatal) {
+            console.warn("HLS fatal error:", errData.type);
+            setPlayerMode("cloud");
           }
         });
-
-        return () => {
-          if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-          }
-        };
       } else if (videoRef.current.canPlayType("application/vnd.apple.mpegurl")) {
         videoRef.current.src = streamUrl;
       }
@@ -347,7 +309,7 @@ export default function VideoPlayer({
       }
       videoRef.current.src = streamUrl;
     }
-  }, [streamUrl, isPlayingIntro, movie.id, profile.id]);
+  }, [streamUrl, isPlayingIntro, movie.id, profile.id, playerMode]);
 
   // 2. Fetch full episodes list if it's a TV series
   useEffect(() => {
@@ -369,7 +331,7 @@ export default function VideoPlayer({
     }
   }, [imdbId, isSeries, movie]);
 
-  // 3. Play FilmFlex Intro Video automatically (100% fullscreen cover)
+  // 3. Play FilmFlex Intro Video automatically
   useEffect(() => {
     if (introVideoRef.current) {
       introVideoRef.current.play().catch(() => {
@@ -385,7 +347,7 @@ export default function VideoPlayer({
     setIsPlayingIntro(false);
     const resumeTime = getMovieResumeTime(profile.id, movie.id);
     setTimeout(() => {
-      if (videoRef.current) {
+      if (videoRef.current && playerMode === "native") {
         if (resumeTime > 0) {
           try {
             videoRef.current.currentTime = resumeTime;
@@ -418,85 +380,93 @@ export default function VideoPlayer({
   // 5. Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (isPlayingIntro) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (e.code === "Space") {
-        e.preventDefault();
-        togglePlay();
-      } else if (e.code === "ArrowRight") {
-        handleSeekDelta(10);
-      } else if (e.code === "ArrowLeft") {
-        handleSeekDelta(-10);
-      } else if (e.code === "ArrowUp") {
-        e.preventDefault();
-        setVolume((v) => Math.min(1, v + 0.1));
-      } else if (e.code === "ArrowDown") {
-        e.preventDefault();
-        setVolume((v) => Math.max(0, v - 0.1));
-      } else if (e.code === "KeyF") {
-        toggleFullscreen();
-      } else if (e.code === "KeyM") {
-        toggleMute();
-      } else if (e.code === "Escape") {
-        if (showEpisodesDrawer) {
-          setShowEpisodesDrawer(false);
-        } else {
-          onBack();
-        }
+      switch (e.key.toLowerCase()) {
+        case " ":
+        case "k":
+          e.preventDefault();
+          togglePlay();
+          break;
+        case "f":
+          e.preventDefault();
+          toggleFullscreen();
+          break;
+        case "m":
+          e.preventDefault();
+          toggleMute();
+          break;
+        case "arrowleft":
+        case "j":
+          e.preventDefault();
+          handleSeekDelta(-10);
+          break;
+        case "arrowright":
+        case "l":
+          e.preventDefault();
+          handleSeekDelta(10);
+          break;
+        case "arrowup":
+          e.preventDefault();
+          if (videoRef.current) {
+            const nextVol = Math.min(1, volume + 0.1);
+            setVolume(nextVol);
+            videoRef.current.volume = nextVol;
+            setIsMuted(false);
+          }
+          break;
+        case "arrowdown":
+          e.preventDefault();
+          if (videoRef.current) {
+            const nextVol = Math.max(0, volume - 0.1);
+            setVolume(nextVol);
+            videoRef.current.volume = nextVol;
+            setIsMuted(nextVol === 0);
+          }
+          break;
+        case "escape":
+          if (activeMenu) {
+            setActiveMenu(null);
+          } else if (showEpisodesDrawer) {
+            setShowEpisodesDrawer(false);
+          }
+          break;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isPlaying, isPlayingIntro, isMuted, duration, currentTime, showEpisodesDrawer]);
+  }, [isPlaying, volume, isMuted, activeMenu, showEpisodesDrawer]);
 
-  // 6. Periodic Progress Saver
-  useEffect(() => {
-    if (isPlayingIntro) return;
-    const saveInterval = setInterval(() => {
-      if (videoRef.current && !videoRef.current.paused && videoRef.current.duration > 0) {
-        saveMovieProgress(
-          profile.id,
-          movie.id,
-          videoRef.current.currentTime,
-          videoRef.current.duration
-        );
-      }
-    }, 4000);
-    return () => clearInterval(saveInterval);
-  }, [isPlayingIntro, profile.id, movie.id]);
-
-  // Video Handlers
+  // 6. Native Video Event Handlers
   const togglePlay = () => {
     if (!videoRef.current) return;
-    if (isPlaying) {
+    if (videoRef.current.paused) {
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+    } else {
       videoRef.current.pause();
       setIsPlaying(false);
-    } else {
-      const p = videoRef.current.play();
-      if (p !== undefined) {
-        p.then(() => setIsPlaying(true)).catch((err) => {
-          console.warn("Playback error handled safely:", err);
-          setIsPlaying(false);
-        });
-      }
     }
   };
 
   const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime);
-      if (videoRef.current.duration) {
-        setDuration(videoRef.current.duration);
-      }
+    if (!videoRef.current) return;
+    const cur = videoRef.current.currentTime;
+    const dur = videoRef.current.duration || duration;
+    setCurrentTime(cur);
+    if (dur && !isNaN(dur)) setDuration(dur);
+
+    // Save progress periodically
+    if (Math.floor(cur) % 5 === 0 && dur > 0) {
+      saveMovieProgress(profile.id, movie.id, cur, dur);
     }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const target = parseFloat(e.target.value);
+    const time = parseFloat(e.target.value);
+    setCurrentTime(time);
     if (videoRef.current) {
-      videoRef.current.currentTime = target;
-      setCurrentTime(target);
+      videoRef.current.currentTime = time;
     }
   };
 
@@ -545,7 +515,7 @@ export default function VideoPlayer({
     }
   };
 
-  // 7. Cast / Share Screen to Smart TV
+  // 7. Cast / Share Screen to Smart TV (YouTube / Google Cast style)
   const handleCastToTV = async () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -583,6 +553,28 @@ export default function VideoPlayer({
     }
   };
 
+  // 8b. Subtitle Selection Handler
+  const handleSelectSubtitle = (subId: string) => {
+    setSelectedSubtitle(subId);
+    setActiveMenu(null);
+    if (videoRef.current && videoRef.current.textTracks) {
+      for (let i = 0; i < videoRef.current.textTracks.length; i++) {
+        const track = videoRef.current.textTracks[i];
+        if (subId === "off") {
+          track.mode = "disabled";
+        } else if (subId === "sub_ar" && track.language === "ar") {
+          track.mode = "showing";
+        } else if (subId === "sub_fr" && track.language === "fr") {
+          track.mode = "showing";
+        } else if (subId === "sub_en" && track.language === "en") {
+          track.mode = "showing";
+        } else {
+          track.mode = "disabled";
+        }
+      }
+    }
+  };
+
   // 9. Next Episode Handlers
   const handleNextEpisode = () => {
     setNextCountdown(null);
@@ -616,6 +608,9 @@ export default function VideoPlayer({
   const remainingTime = duration > currentTime ? duration - currentTime : 0;
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const currentSeasonEpisodes = episodesList.filter((e) => e.season === currentSeason);
+
+  // Subtitle API parameters
+  const subParams = `imdbId=${imdbId}${isSeries ? `&season=${currentSeason}&episode=${currentEpisode}` : ""}`;
 
   return (
     <div
@@ -651,75 +646,110 @@ export default function VideoPlayer({
         </div>
       ) : (
         /* ============================================================ */
-        /* 2. PURE CLEAN STREMIO-IDENTICAL NATIVE PLAYER                 */
+        /* 2. PLAYER VIEWPORT (NATIVE HTML5 OR CLOUD EMBED)             */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {/* Native HTML5 Video Element (Protected with HLS.js and safe error recovery) */}
-          <video
-            ref={videoRef}
-            onClick={togglePlay}
-            onTimeUpdate={handleTimeUpdate}
-            onWaiting={() => setIsLoading(true)}
-            onPlaying={() => {
-              setIsLoading(false);
-              setIsPlaying(true);
-            }}
-            onCanPlay={() => setIsLoading(false)}
-            onLoadedData={() => setIsLoading(false)}
-            onError={() => {
-              console.warn("Video playback error handled gracefully");
-              setIsLoading(false);
-            }}
-            onEnded={() => {
-              if (isSeries) {
-                setNextCountdown(5);
-                const timer = setInterval(() => {
-                  setNextCountdown((prev) => {
-                    if (prev === 1) {
-                      clearInterval(timer);
-                      handleNextEpisode();
-                      return null;
-                    }
-                    return prev ? prev - 1 : null;
-                  });
-                }, 1000);
-              } else {
-                saveMovieProgress(profile.id, movie.id, duration, duration);
-                onBack();
-              }
-            }}
-            className={`w-full h-full cursor-pointer transition-all duration-300 ${
-              aspectMode === "cover" ? "object-cover" : "object-contain"
-            }`}
-            preload="auto"
-            playsInline
-          />
+          {playerMode === "cloud" ? (
+            /* Cloud Web Player (Zero buffer, works everywhere on Vercel) */
+            <div className="relative w-full h-full bg-black">
+              <iframe
+                src={getCloudStreamUrl()}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                allowFullScreen
+                referrerPolicy="origin"
+              />
+            </div>
+          ) : (
+            /* Native HTML5 Video Element with Full Subtitles */
+            <video
+              ref={videoRef}
+              onClick={togglePlay}
+              onTimeUpdate={handleTimeUpdate}
+              onWaiting={() => setIsLoading(true)}
+              onPlaying={() => {
+                setIsLoading(false);
+                setIsPlaying(true);
+              }}
+              onCanPlay={() => setIsLoading(false)}
+              onLoadedData={() => setIsLoading(false)}
+              onError={() => {
+                console.warn("Native player error — switching to Cloud Stream");
+                setPlayerMode("cloud");
+                setIsLoading(false);
+              }}
+              onEnded={() => {
+                if (isSeries) {
+                  setNextCountdown(5);
+                  const timer = setInterval(() => {
+                    setNextCountdown((prev) => {
+                      if (prev === 1) {
+                        clearInterval(timer);
+                        handleNextEpisode();
+                        return null;
+                      }
+                      return prev ? prev - 1 : null;
+                    });
+                  }, 1000);
+                } else {
+                  saveMovieProgress(profile.id, movie.id, duration, duration);
+                  onBack();
+                }
+              }}
+              className={`w-full h-full cursor-pointer transition-all duration-300 ${
+                aspectMode === "cover" ? "object-cover" : "object-contain"
+              }`}
+              preload="auto"
+              playsInline
+              crossOrigin="anonymous"
+            >
+              {/* Real OpenSubtitles tracks via FilmFlex Subtitle Proxy */}
+              <track
+                label="العربية (Arabic)"
+                kind="subtitles"
+                srcLang="ar"
+                src={`/api/subtitles?${subParams}&lang=ara`}
+                default={selectedSubtitle === "sub_ar"}
+              />
+              <track
+                label="Français (French)"
+                kind="subtitles"
+                srcLang="fr"
+                src={`/api/subtitles?${subParams}&lang=fre`}
+                default={selectedSubtitle === "sub_fr"}
+              />
+              <track
+                label="English [CC]"
+                kind="subtitles"
+                srcLang="en"
+                src={`/api/subtitles?${subParams}&lang=eng`}
+                default={selectedSubtitle === "sub_en"}
+              />
+            </video>
+          )}
 
           {/* FilmFlex Loading Spinner */}
-          {isLoading && (
+          {isLoading && playerMode === "native" && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <div className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-black/70 backdrop-blur-md border border-white/10 max-w-sm mx-4 text-center">
+              <div className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-black/75 backdrop-blur-md border border-white/10 max-w-sm mx-4 text-center">
                 <div className="relative flex items-center justify-center">
-                  <Loader2 className="w-14 h-14 text-[#E50914] animate-spin opacity-90" />
+                  <Loader2 className="w-14 h-14 text-[#E50914] animate-spin opacity-95" />
                   <div className="absolute text-[10px] text-white font-black tracking-widest">
                     FILMFLEX
                   </div>
                 </div>
                 <span className="text-xs text-neutral-300 font-mono tracking-wide">
-                  Buffering {selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}...
+                  Chargement {selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}...
                 </span>
-                {showFastSwitch && (
-                  <div className="animate-fade-in flex flex-col items-center gap-2 mt-1 pointer-events-auto">
-                    <p className="text-[11px] text-neutral-400">Connexion en cours...</p>
-                    <button
-                      onClick={handleFastSwitch}
-                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5 transition-all hover:scale-105"
-                    >
-                      <RotateCw className="w-3.5 h-3.5 text-[#E50914]" />
-                      <span>Recharger le flux</span>
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={() => {
+                    setPlayerMode("cloud");
+                    setIsLoading(false);
+                  }}
+                  className="px-4 py-1.5 mt-1 bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold rounded-full shadow-lg pointer-events-auto transition-transform hover:scale-105"
+                >
+                  Passer au Serveur Cloud HD ⚡
+                </button>
               </div>
             </div>
           )}
@@ -772,14 +802,14 @@ export default function VideoPlayer({
 
           {/* Cast Notification Badge */}
           {castNotice && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-black/90 border border-purple-500/50 text-white text-xs font-semibold px-5 py-2.5 rounded-full shadow-2xl animate-fade-in flex items-center gap-2 z-40">
-              <Tv className="w-4 h-4 text-purple-400" />
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-black/90 border border-[#E50914]/50 text-white text-xs font-semibold px-5 py-2.5 rounded-full shadow-2xl animate-fade-in flex items-center gap-2 z-40">
+              <Cast className="w-4 h-4 text-[#E50914]" />
               <span>{castNotice}</span>
             </div>
           )}
 
           {/* ============================================================ */}
-          {/* TOP BAR                                                      */}
+          {/* TOP BAR: Clean, Minimal, Desktop-Optimized                   */}
           {/* ============================================================ */}
           <div
             className={`absolute top-0 left-0 right-0 p-3 sm:p-6 bg-gradient-to-b from-black/90 via-black/40 to-transparent flex items-center justify-between transition-opacity duration-300 z-30 ${
@@ -794,37 +824,110 @@ export default function VideoPlayer({
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-xs sm:text-base font-medium tracking-wide text-neutral-200 truncate max-w-[140px] sm:max-w-md">
+              <h2 className="text-xs sm:text-base font-semibold tracking-wide text-neutral-200 truncate max-w-[140px] sm:max-w-md">
                 {movie.title}
                 {isSeries && ` (${currentSeason}x${currentEpisode})`}
               </h2>
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-3">
-              {/* Rotate Screen button for mobile / portrait phones */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Server Switcher Pill */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenu(activeMenu === "server" ? null : "server")}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all ${
+                    playerMode === "cloud"
+                      ? "bg-red-950/80 border-[#E50914] text-white shadow-[0_0_10px_rgba(229,9,20,0.5)]"
+                      : "bg-neutral-900/90 border-neutral-700 text-neutral-300 hover:border-neutral-500"
+                  }`}
+                  title="Changer de serveur"
+                >
+                  <span className="w-2 h-2 rounded-full bg-[#E50914] animate-pulse" />
+                  <span>{playerMode === "cloud" ? `Serveur Cloud (${cloudServer.toUpperCase()})` : "Stremio Local"}</span>
+                </button>
+
+                {activeMenu === "server" && (
+                  <div className="absolute top-10 right-0 w-60 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-xl p-2 shadow-2xl z-50 animate-scale-up space-y-1">
+                    <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
+                      Sélection du Serveur
+                    </div>
+                    <button
+                      onClick={() => {
+                        setPlayerMode("cloud");
+                        setCloudServer("vidlink");
+                        setActiveMenu(null);
+                      }}
+                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white">Serveur Cloud 1 (VidLink HD)</span>
+                        <span className="text-[10px] text-neutral-400">Recommandé Vercel / Web</span>
+                      </div>
+                      {playerMode === "cloud" && cloudServer === "vidlink" && (
+                        <Check className="w-4 h-4 text-[#E50914]" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPlayerMode("cloud");
+                        setCloudServer("vidsrc");
+                        setActiveMenu(null);
+                      }}
+                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white">Serveur Cloud 2 (VidSrc)</span>
+                        <span className="text-[10px] text-neutral-400">Flux alternatif</span>
+                      </div>
+                      {playerMode === "cloud" && cloudServer === "vidsrc" && (
+                        <Check className="w-4 h-4 text-[#E50914]" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPlayerMode("native");
+                        setIsLoading(true);
+                        setActiveMenu(null);
+                      }}
+                      className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-semibold text-white">Serveur Stremio Local</span>
+                        <span className="text-[10px] text-neutral-400">Pour PC avec Stremio actif</span>
+                      </div>
+                      {playerMode === "native" && <Check className="w-4 h-4 text-[#E50914]" />}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Open in Stremio App Deep Link if available */}
+              {stremioAppUrl && (
+                <a
+                  href={stremioAppUrl}
+                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-semibold transition-all hover:text-white"
+                  title="Ouvrir dans l'application Stremio"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-[#E50914]" />
+                  <span>App Stremio</span>
+                </a>
+              )}
+
+              {/* Rotate Screen button: ONLY ON MOBILE (hidden on desktop md:hidden) */}
               <button
                 onClick={toggleRotate}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-[10px] sm:text-xs font-semibold transition-all"
-                title="Tourner l'écran (Paysage / Portrait)"
+                className="flex md:hidden items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-[10px] font-semibold transition-all"
+                title="Tourner l'écran"
               >
-                <RotateCw className="w-3.5 h-3.5 text-purple-400" />
+                <RotateCw className="w-3.5 h-3.5 text-[#E50914]" />
                 <span>{isLandscapeMode ? "Portrait" : "Paysage"}</span>
-              </button>
-
-              {/* Fit / Cover mode toggle */}
-              <button
-                onClick={() => setAspectMode(aspectMode === "contain" ? "cover" : "contain")}
-                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-semibold transition-all"
-                title="Ajuster le format (Adapter / Remplir)"
-              >
-                <Scaling className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-[10px] sm:text-xs">{aspectMode === "contain" ? "Adapter" : "Remplir"}</span>
               </button>
 
               <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-neutral-900/90 text-neutral-300 border border-neutral-700 text-[10px] sm:text-xs font-mono font-semibold uppercase">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}</span>
+                <span>1080P HD</span>
               </span>
+
               <button
                 onClick={toggleFullscreen}
                 className="text-neutral-300 hover:text-white transition-colors p-1"
@@ -836,58 +939,62 @@ export default function VideoPlayer({
           </div>
 
           {/* ============================================================ */}
-          {/* BOTTOM CONTROLS BAR: Exact Stremio Replica                   */}
+          {/* BOTTOM CONTROLS BAR: Clean Netflix Red Theme                  */}
           {/* ============================================================ */}
           <div
             className={`absolute bottom-0 left-0 right-0 px-4 md:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col gap-2 transition-opacity duration-300 z-30 ${
               showControls ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            {/* Scrubber Timeline Bar */}
-            <div className="flex items-center gap-3 w-full">
-              <span className="text-[11px] font-mono text-neutral-400 w-14 text-right">
-                {formatTime(currentTime)}
-              </span>
+            {/* Scrubber Timeline Bar (Red) */}
+            {playerMode === "native" && (
+              <div className="flex items-center gap-3 w-full">
+                <span className="text-[11px] font-mono text-neutral-400 w-14 text-right">
+                  {formatTime(currentTime)}
+                </span>
 
-              {/* Glowing Purple Progress Bar */}
-              <div className="relative flex-1 group/slider flex items-center cursor-pointer">
-                <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
+                {/* Glowing Netflix Red Progress Bar */}
+                <div className="relative flex-1 group/slider flex items-center cursor-pointer">
+                  <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#E50914] rounded-full shadow-[0_0_10px_rgba(229,9,20,0.8)]"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+
                   <div
-                    className="h-full bg-gradient-to-r from-purple-700 via-purple-600 to-purple-500 rounded-full shadow-[0_0_8px_rgba(168,85,247,0.7)]"
-                    style={{ width: `${progressPercent}%` }}
+                    className="absolute w-3.5 h-3.5 bg-[#E50914] rounded-full shadow-[0_0_12px_rgba(229,9,20,1)] -translate-x-1/2 pointer-events-none transition-transform group-hover/slider:scale-125"
+                    style={{ left: `${progressPercent}%` }}
+                  />
+
+                  <input
+                    type="range"
+                    min={0}
+                    max={duration || 100}
+                    value={currentTime}
+                    onChange={handleSeek}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
                 </div>
 
-                <div
-                  className="absolute w-3.5 h-3.5 bg-purple-400 rounded-full shadow-[0_0_10px_#A855F7] -translate-x-1/2 pointer-events-none"
-                  style={{ left: `${progressPercent}%` }}
-                />
-
-                <input
-                  type="range"
-                  min={0}
-                  max={duration || 100}
-                  value={currentTime}
-                  onChange={handleSeek}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
+                <span className="text-[11px] font-mono text-neutral-400 w-16">
+                  -{formatTime(remainingTime)}
+                </span>
               </div>
-
-              <span className="text-[11px] font-mono text-neutral-400 w-16">
-                -{formatTime(remainingTime)}
-              </span>
-            </div>
+            )}
 
             {/* Bottom Controls Row */}
             <div className="flex items-center justify-between pt-1">
               {/* Left Controls: Play/Pause, Next Episode, Volume Slider */}
               <div className="flex items-center gap-4 md:gap-5">
-                <button
-                  onClick={togglePlay}
-                  className="text-neutral-300 hover:text-white transition-colors"
-                >
-                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
-                </button>
+                {playerMode === "native" && (
+                  <button
+                    onClick={togglePlay}
+                    className="text-neutral-300 hover:text-white transition-colors"
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
+                  </button>
+                )}
 
                 {isSeries && (
                   <button
@@ -899,215 +1006,184 @@ export default function VideoPlayer({
                   </button>
                 )}
 
-                {/* Volume Speaker + Horizontal Slider (Hidden on mobile to prioritize touch buttons) */}
-                <div className="hidden sm:flex items-center gap-2 group/vol">
-                  <button
-                    onClick={toggleMute}
-                    className="text-neutral-300 hover:text-white transition-colors"
-                  >
-                    {isMuted || volume === 0 ? (
-                      <VolumeX className="w-5 h-5" />
-                    ) : (
-                      <Volume2 className="w-5 h-5" />
-                    )}
-                  </button>
-                  <input
-                    type="range"
-                    min={0}
-                    max={1}
-                    step={0.05}
-                    value={isMuted ? 0 : volume}
-                    onChange={handleVolumeChange}
-                    className="w-16 md:w-24 h-1 bg-neutral-700 accent-orange-500 rounded-lg appearance-none cursor-pointer"
-                  />
-                </div>
-              </div>
-
-              {/* Right Tools */}
-              <div className="flex items-center gap-3 md:gap-4 relative">
-                {/* 1. 📑 Épisodes Drawer Button (for Series) */}
+                {/* Episodes Drawer Toggle Button */}
                 {isSeries && (
                   <button
                     onClick={() => setShowEpisodesDrawer(!showEpisodesDrawer)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-neutral-800/80 hover:bg-neutral-700 text-xs text-neutral-200 hover:text-white transition-colors border border-neutral-700"
-                    title="Liste des épisodes"
+                    className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white px-2.5 py-1 rounded bg-neutral-900 border border-neutral-700 hover:border-neutral-500 transition-colors"
                   >
-                    <ListVideo className="w-4 h-4 text-purple-400" />
+                    <ListVideo className="w-4 h-4 text-[#E50914]" />
                     <span className="hidden sm:inline">Épisodes</span>
                   </button>
                 )}
 
-                {/* 2. ⚙️ Quality Selector (Qualité fluide selon la connexion) */}
-                <div className="relative">
-                  <button
-                    onClick={() => setActiveMenu(activeMenu === "quality" ? null : "quality")}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border border-neutral-700 hover:border-neutral-500 transition-colors ${
-                      activeMenu === "quality" ? "bg-purple-900/60 text-purple-300 border-purple-500" : "text-neutral-300"
-                    }`}
-                    title="Qualité vidéo"
-                  >
-                    <Settings2 className="w-3.5 h-3.5" />
-                    <span className="uppercase text-[11px]">{selectedQuality}</span>
-                  </button>
+                {/* Volume & Mute */}
+                {playerMode === "native" && (
+                  <div className="flex items-center gap-2 group/vol">
+                    <button
+                      onClick={toggleMute}
+                      className="text-neutral-300 hover:text-white transition-colors p-1"
+                    >
+                      {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 text-[#E50914]" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={isMuted ? 0 : volume}
+                      onChange={handleVolumeChange}
+                      className="w-16 md:w-24 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-[#E50914] hidden sm:block"
+                    />
+                  </div>
+                )}
+              </div>
 
-                  {/* Quality Popover */}
-                  {activeMenu === "quality" && (
-                    <div className="absolute bottom-12 right-0 w-64 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                      <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                        Qualité du Flux Vidéo
+              {/* Right Controls: Quality, Cast, Speed, Subtitles, PiP */}
+              <div className="flex items-center gap-3 md:gap-4">
+                {/* 1. Quality Selector */}
+                {playerMode === "native" && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setActiveMenu(activeMenu === "quality" ? null : "quality")}
+                      className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border border-neutral-700 hover:border-neutral-500 transition-colors ${
+                        activeMenu === "quality" ? "bg-red-950/60 text-red-400 border-red-600" : "text-neutral-300"
+                      }`}
+                      title="Qualité vidéo"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                      <span className="uppercase text-[11px]">{selectedQuality}</span>
+                    </button>
+
+                    {activeMenu === "quality" && (
+                      <div className="absolute bottom-12 right-0 w-64 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
+                        <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
+                          Qualité du Flux Vidéo
+                        </div>
+                        {availableQualities.map((q) => (
+                          <button
+                            key={q.key}
+                            onClick={() => handleSelectQuality(q.key)}
+                            className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                          >
+                            <span>{q.label}</span>
+                            {selectedQuality === q.key && (
+                              <Check className="w-3.5 h-3.5 text-[#E50914]" />
+                            )}
+                          </button>
+                        ))}
                       </div>
-                      {availableQualities.map((q) => (
-                        <button
-                          key={q.key}
-                          onClick={() => handleSelectQuality(q.key)}
-                          className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
-                        >
-                          <span>{q.label}</span>
-                          {selectedQuality === q.key && (
-                            <Check className="w-3.5 h-3.5 text-purple-400" />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
-                {/* 3. 📺 Cast / Share Screen to Smart TV */}
+                {/* 2. Authentic YouTube / Google Cast Button */}
                 <button
                   onClick={handleCastToTV}
-                  className="text-neutral-300 hover:text-white transition-colors p-1"
-                  title="Diffuser sur Smart TV / Partager l'écran"
+                  className="text-neutral-300 hover:text-[#E50914] transition-colors p-1"
+                  title="Diffuser sur Smart TV / Chromecast"
                 >
-                  <Tv className="w-4 h-4 text-purple-400 hover:text-purple-300" />
+                  <Cast className="w-5 h-5" />
                 </button>
 
-                {/* 4. ⏱ Playback Speed */}
-                <div className="relative">
-                  <button
-                    onClick={() => setActiveMenu(activeMenu === "speed" ? null : "speed")}
-                    className={`text-neutral-300 hover:text-white transition-colors p-1 ${
-                      activeMenu === "speed" ? "text-purple-400" : ""
-                    }`}
-                    title="Vitesse de lecture"
-                  >
-                    <Gauge className="w-4 h-4" />
-                  </button>
+                {/* 3. Playback Speed */}
+                {playerMode === "native" && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setActiveMenu(activeMenu === "speed" ? null : "speed")}
+                      className={`text-neutral-300 hover:text-white transition-colors p-1 ${
+                        activeMenu === "speed" ? "text-[#E50914]" : ""
+                      }`}
+                      title="Vitesse de lecture"
+                    >
+                      <Gauge className="w-4 h-4" />
+                    </button>
 
-                  {activeMenu === "speed" && (
-                    <div className="absolute bottom-12 right-0 w-36 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                      <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                        Vitesse
+                    {activeMenu === "speed" && (
+                      <div className="absolute bottom-12 right-0 w-36 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
+                        <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
+                          Vitesse
+                        </div>
+                        {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
+                          <button
+                            key={spd}
+                            onClick={() => {
+                              setPlaybackSpeed(spd);
+                              if (videoRef.current) videoRef.current.playbackRate = spd;
+                              setActiveMenu(null);
+                            }}
+                            className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                          >
+                            <span>{spd}x {spd === 1 && "(Normal)"}</span>
+                            {playbackSpeed === spd && <Check className="w-3.5 h-3.5 text-[#E50914]" />}
+                          </button>
+                        ))}
                       </div>
-                      {[0.5, 0.75, 1, 1.25, 1.5, 2].map((spd) => (
+                    )}
+                  </div>
+                )}
+
+                {/* 4. Real OpenSubtitles Selector */}
+                {playerMode === "native" && (
+                  <div className="relative">
+                    <button
+                      onClick={() => setActiveMenu(activeMenu === "subtitles" ? null : "subtitles")}
+                      className={`text-neutral-300 hover:text-white transition-colors p-1 ${
+                        activeMenu === "subtitles" ? "text-[#E50914]" : ""
+                      }`}
+                      title="Sous-titres"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                    </button>
+
+                    {activeMenu === "subtitles" && (
+                      <div className="absolute bottom-12 right-0 w-60 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
+                        <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
+                          Sous-titres OpenSubtitles
+                        </div>
                         <button
-                          key={spd}
-                          onClick={() => {
-                            setPlaybackSpeed(spd);
-                            if (videoRef.current) videoRef.current.playbackRate = spd;
-                            setActiveMenu(null);
-                          }}
+                          onClick={() => handleSelectSubtitle("off")}
                           className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                         >
-                          <span>{spd}x {spd === 1 && "(Normal)"}</span>
-                          {playbackSpeed === spd && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                          <span>Désactivé</span>
+                          {selectedSubtitle === "off" && <Check className="w-3.5 h-3.5 text-[#E50914]" />}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 5. 🗩 Subtitles */}
-                <div className="relative">
-                  <button
-                    onClick={() => setActiveMenu(activeMenu === "subtitles" ? null : "subtitles")}
-                    className={`text-neutral-300 hover:text-white transition-colors p-1 ${
-                      activeMenu === "subtitles" ? "text-purple-400" : ""
-                    }`}
-                    title="Sous-titres"
-                  >
-                    <MessageSquare className="w-4 h-4" />
-                  </button>
-
-                  {activeMenu === "subtitles" && (
-                    <div className="absolute bottom-12 right-0 w-60 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                      <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                        Sous-titres
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedSubtitle("off");
-                          setActiveMenu(null);
-                        }}
-                        className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
-                      >
-                        <span>Désactivé</span>
-                        {selectedSubtitle === "off" && <Check className="w-3.5 h-3.5 text-purple-400" />}
-                      </button>
-                      {movie.subtitles.map((sub) => (
                         <button
-                          key={sub.id}
-                          onClick={() => {
-                            setSelectedSubtitle(sub.id);
-                            setActiveMenu(null);
-                          }}
+                          onClick={() => handleSelectSubtitle("sub_ar")}
                           className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                         >
-                          <span>{sub.label}</span>
-                          {selectedSubtitle === sub.id && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                          <span>العربية (Arabic)</span>
+                          {selectedSubtitle === "sub_ar" && <Check className="w-3.5 h-3.5 text-[#E50914]" />}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* 6. ılılı Audio Tracks */}
-                <div className="relative">
-                  <button
-                    onClick={() => setActiveMenu(activeMenu === "audio" ? null : "audio")}
-                    className={`text-neutral-300 hover:text-white transition-colors p-1 ${
-                      activeMenu === "audio" ? "text-purple-400" : ""
-                    }`}
-                    title="Audio"
-                  >
-                    <Sliders className="w-4 h-4" />
-                  </button>
-
-                  {activeMenu === "audio" && (
-                    <div className="absolute bottom-12 right-0 w-64 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-lg p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                      <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                        Piste Audio
-                      </div>
-                      {movie.audioTracks.map((aud) => (
                         <button
-                          key={aud.id}
-                          onClick={() => setActiveMenu(null)}
+                          onClick={() => handleSelectSubtitle("sub_fr")}
                           className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                         >
-                          <span>{aud.label}</span>
-                          {aud.isDefault && <Check className="w-3.5 h-3.5 text-purple-400" />}
+                          <span>Français (French)</span>
+                          {selectedSubtitle === "sub_fr" && <Check className="w-3.5 h-3.5 text-[#E50914]" />}
                         </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        <button
+                          onClick={() => handleSelectSubtitle("sub_en")}
+                          className="w-full flex items-center justify-between text-xs py-1.5 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
+                        >
+                          <span>English [CC]</span>
+                          {selectedSubtitle === "sub_en" && <Check className="w-3.5 h-3.5 text-[#E50914]" />}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-                {/* 7. 🗗 Picture in Picture */}
-                <button
-                  onClick={togglePiP}
-                  className="text-neutral-300 hover:text-white transition-colors p-1 hidden sm:block"
-                  title="Picture in Picture"
-                >
-                  <PictureInPicture2 className="w-4 h-4" />
-                </button>
-
-                {/* 8. 🔄 Tourner l'écran (Uniquement sur Téléphone / Mobile) */}
-                <button
-                  onClick={toggleRotate}
-                  className="text-neutral-300 hover:text-white transition-colors p-1 md:hidden"
-                  title="Tourner l'écran (Paysage / Portrait)"
-                >
-                  <RotateCw className="w-4 h-4 text-purple-400" />
-                </button>
+                {/* 5. Picture in Picture */}
+                {playerMode === "native" && (
+                  <button
+                    onClick={togglePiP}
+                    className="text-neutral-300 hover:text-white transition-colors p-1 hidden sm:block"
+                    title="Picture in Picture"
+                  >
+                    <PictureInPicture2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1119,7 +1195,7 @@ export default function VideoPlayer({
             <div className="absolute top-0 right-0 bottom-0 w-full sm:w-96 bg-[#141414]/95 backdrop-blur-xl border-l border-neutral-800 z-50 flex flex-col p-4 sm:p-6 animate-scale-up shadow-2xl">
               <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <ListVideo className="w-5 h-5 text-purple-400" />
+                  <ListVideo className="w-5 h-5 text-[#E50914]" />
                   <span>Saison {currentSeason} • Épisodes</span>
                 </h3>
                 <button
@@ -1139,31 +1215,35 @@ export default function VideoPlayer({
                       onClick={() => handleSelectEpisode(ep)}
                       className={`group flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all border ${
                         isCurrent
-                          ? "bg-purple-900/30 border-purple-500/60 shadow"
+                          ? "bg-[#E50914]/20 border-[#E50914]/60 shadow"
                           : "bg-neutral-900/60 hover:bg-neutral-800/80 border-neutral-800"
                       }`}
                     >
-                      <span className={`text-sm font-bold w-5 text-center ${isCurrent ? "text-purple-400" : "text-neutral-500"}`}>
-                        {ep.episode}
-                      </span>
-                      <div className="relative w-20 aspect-[16/9] rounded overflow-hidden bg-neutral-800 flex-none">
+                      <div className="relative w-24 aspect-video rounded overflow-hidden flex-none bg-neutral-800">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={ep.thumbnail || movie.backdropUrl}
                           alt={ep.title}
                           className="w-full h-full object-cover"
+                          loading="lazy"
                         />
-                        {isCurrent && (
-                          <div className="absolute inset-0 bg-purple-600/30 flex items-center justify-center">
-                            <Play className="w-3.5 h-3.5 fill-white text-white" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="truncate flex-1">
-                        <div className={`text-xs font-semibold truncate ${isCurrent ? "text-purple-300" : "text-white"}`}>
-                          {ep.title}
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Play className="w-5 h-5 fill-white text-white" />
                         </div>
-                        <div className="text-[10px] text-neutral-400">~45m</div>
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between text-xs font-semibold text-white">
+                          <span className="truncate">{ep.title}</span>
+                          <span className="text-[10px] text-neutral-400 font-mono">
+                            {ep.episode < 10 ? `E0${ep.episode}` : `E${ep.episode}`}
+                          </span>
+                        </div>
+                        {ep.overview && (
+                          <p className="text-[11px] text-neutral-400 line-clamp-2 mt-1">
+                            {ep.overview}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
