@@ -29,7 +29,7 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "mondial" | "torrentio";
+type ServerType = "vidlink" | "torrentio" | "embedsu" | "mondial" | "tunisien";
 
 interface ServerOption {
   id: ServerType;
@@ -40,16 +40,34 @@ interface ServerOption {
 
 const SERVER_OPTIONS: ServerOption[] = [
   {
-    id: "mondial",
-    name: "Serveur 1 (FilmFlex Mondial)",
-    badge: "⭐ Mondial Pro",
-    description: "Serveur mondial complet • Compatible avec 100% des films et séries",
+    id: "vidlink",
+    name: "Serveur 1 (Netflix Ultra HD)",
+    badge: "⭐ 100% Sans Pub",
+    description: "Moteur Netflix 4K ultra fluide • Zéro pub ni redirection, sous-titres FR/AR",
   },
   {
     id: "torrentio",
     name: "Serveur 2 (Torrentio CDN 4K)",
     badge: "Torrentio 4K",
-    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p",
+    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p sans pub",
+  },
+  {
+    id: "embedsu",
+    name: "Serveur 3 (FilmFlex Multi-Langues)",
+    badge: "Multi-Langues",
+    description: "Multi-serveur haute vitesse avec sous-titres arabes et français",
+  },
+  {
+    id: "mondial",
+    name: "Serveur 4 (FilmFlex Mondial)",
+    badge: "Mondial Backup",
+    description: "Serveur mondial complet (Vidsrc) en secours si un film est manquant",
+  },
+  {
+    id: "tunisien",
+    name: "Serveur 5 (Cinéma Tunisien Officiel)",
+    badge: "🇹🇳 Tunisien HD",
+    description: "Diffusion officielle directe pour Choufly Hal, Nouba et films tunisiens",
   },
 ];
 
@@ -90,8 +108,15 @@ export default function VideoPlayer({
   const [episodesList, setEpisodesList] = useState<Episode[]>([]);
   const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
 
-  // Player state: Mondial is default for universal compatibility across all movies
-  const [activeServer, setActiveServer] = useState<ServerType>("mondial");
+  const isTunisian =
+    Boolean(movie.genres?.some((g) => g.toLowerCase().includes("tunis"))) ||
+    movie.id.includes("choufly") ||
+    movie.id.includes("nouba");
+
+  // Player state: Tunisian server for Tunisian cinema/series, VidLink Pro (100% zero ads) for everything else
+  const [activeServer, setActiveServer] = useState<ServerType>(
+    isTunisian ? "tunisien" : "vidlink"
+  );
   const [showServerMenu, setShowServerMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -312,23 +337,56 @@ export default function VideoPlayer({
     }
   };
 
-  // Build stream URL according to selected server (Mondial & Torrentio only)
+  // Build stream URL according to selected server
   const getStreamUrl = () => {
-    if (activeServer === "mondial") {
-      // Server 1 (DEFAULT): FilmFlex Mondial - Universal compatibility across all movies & series
-      return isSeries
-        ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
+    // 1. Tunisian Cinema & Series: Direct clean embed without scrapers
+    if (activeServer === "tunisien") {
+      if (movie.id.includes("choufly")) {
+        const epIndex = Math.max(0, currentEpisode - 1);
+        return `https://www.youtube-nocookie.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1`;
+      }
+      if (movie.trailerYoutubeId) {
+        return `https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&rel=0`;
+      }
+      if (movie.videoUrl && movie.videoUrl !== "/sample.mp4") {
+        return movie.videoUrl;
+      }
     }
-    // Server 2: Torrentio CDN 4K
+
+    // 2. Server 1 (DEFAULT): VidLink Pro (Netflix 4K - 100% Zero-Ads, Zero-Popups, FR/AR subtitles)
+    if (activeServer === "vidlink") {
+      return isSeries
+        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
+        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
+    }
+
+    // 3. Server 2: Torrentio CDN 4K (Clean CDN Stream Engine)
+    if (activeServer === "torrentio") {
+      return isSeries
+        ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
+        : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
+    }
+
+    // 4. Server 3: Embed.su Multi-Language Player
+    if (activeServer === "embedsu") {
+      return isSeries
+        ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+        : `https://embed.su/embed/movie/${imdbId}`;
+    }
+
+    // 5. Server 4: FilmFlex Mondial Backup (vidsrc.me)
     return isSeries
-      ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
-      : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
+      ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
+      : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
   };
 
-  // 1-Click Auto-Best Switcher (Anti-Coupure) toggling between Mondial & Torrentio
+  // 1-Click Auto-Best Switcher (Anti-Coupure)
   const handleAutoBestSwitch = () => {
-    const nextServer: ServerType = activeServer === "mondial" ? "torrentio" : "mondial";
+    const serverOrder: ServerType[] = isTunisian
+      ? ["tunisien", "vidlink", "torrentio", "embedsu", "mondial"]
+      : ["vidlink", "torrentio", "embedsu", "mondial"];
+    const currentIndex = serverOrder.indexOf(activeServer);
+    const nextServer = serverOrder[(currentIndex + 1) % serverOrder.length];
     setActiveServer(nextServer);
     const nextInfo = SERVER_OPTIONS.find((s) => s.id === nextServer);
     setResumedNotice(`⚡ Basculé sur : ${nextInfo?.name || "Serveur alternatif"}`);
@@ -345,7 +403,8 @@ export default function VideoPlayer({
   };
 
   const currentSeasonEpisodes = episodesList.filter((e) => e.season === currentSeason);
-  const activeServerInfo = SERVER_OPTIONS.find((s) => s.id === activeServer) || SERVER_OPTIONS[0];
+  const availableServers = SERVER_OPTIONS.filter((srv) => srv.id !== "tunisien" || isTunisian);
+  const activeServerInfo = availableServers.find((s) => s.id === activeServer) || availableServers[0];
 
   return (
     <div
@@ -496,9 +555,9 @@ export default function VideoPlayer({
                   <div className="absolute top-11 right-0 w-72 bg-[#141414]/95 backdrop-blur-xl border border-neutral-800 rounded-2xl p-2.5 shadow-2xl z-50 animate-scale-up space-y-1">
                     <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800 flex items-center justify-between">
                       <span>Serveurs de Streaming</span>
-                      <span className="text-[10px] text-emerald-400">Mondial Par Défaut</span>
+                      <span className="text-[10px] text-emerald-400">100% Zéro Pub (Netflix)</span>
                     </div>
-                    {SERVER_OPTIONS.map((srv) => (
+                    {availableServers.map((srv) => (
                       <button
                         key={srv.id}
                         onClick={() => {
