@@ -90,12 +90,13 @@ export default function MovieModal({
           {showTrailer && movie.trailerYoutubeId ? (
             <div className="relative w-full h-full pointer-events-auto">
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
+                src={`https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
                   isTrailerMuted ? 1 : 0
-                }&controls=0&modestbranding=1&rel=0&loop=1`}
+                }&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`}
                 title={movie.title}
                 className="w-full h-full object-cover"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                referrerPolicy="strict-origin-when-cross-origin"
               />
             </div>
           ) : (

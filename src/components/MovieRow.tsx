@@ -66,11 +66,11 @@ export default function MovieRow({
           </button>
         )}
 
-        {/* Scrollable Movies Track */}
+        {/* Scrollable Movies Track with generous padding so hover cards never clip */}
         <div
           ref={rowRef}
           onScroll={checkScroll}
-          className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-4 px-1"
+          className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-12 md:py-16 -my-8 md:-my-10 px-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {movies.map((movie, index) => {
@@ -87,6 +87,8 @@ export default function MovieRow({
                 onPlay={onPlay}
                 onToggleMyList={onToggleMyList}
                 onOpenModal={onOpenModal}
+                isFirst={index === 0}
+                isLast={index === movies.length - 1}
               />
             );
           })}

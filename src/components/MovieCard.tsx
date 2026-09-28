@@ -12,6 +12,8 @@ interface MovieCardProps {
   onToggleMyList: (movie: Movie) => void;
   onOpenModal: (movie: Movie) => void;
   top10Rank?: number;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
 export default function MovieCard({
@@ -22,6 +24,8 @@ export default function MovieCard({
   onToggleMyList,
   onOpenModal,
   top10Rank,
+  isFirst = false,
+  isLast = false,
 }: MovieCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showTrailer, setShowTrailer] = useState(false);
@@ -30,10 +34,10 @@ export default function MovieCard({
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    // 500ms delay to start trailer preview like Netflix
+    // 700ms deliberate hover delay to prevent spamming YouTube embed requests
     hoverTimerRef.current = setTimeout(() => {
       setShowTrailer(true);
-    }, 500);
+    }, 700);
   };
 
   const handleMouseLeave = () => {
@@ -51,9 +55,23 @@ export default function MovieCard({
     };
   }, []);
 
+  // Smart horizontal alignment: Never clip off left or right edge of the screen
+  const horizontalAlign = isFirst
+    ? "left-0 translate-x-0 origin-left"
+    : isLast
+    ? "right-0 left-auto translate-x-0 origin-right"
+    : "left-1/2 -translate-x-1/2 origin-center";
+
+  // Build clean YouTube embed URL with strict origin policy
+  const youtubeEmbedUrl = movie.trailerYoutubeId
+    ? `https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${movie.trailerYoutubeId}&playsinline=1&enablejsapi=1&rel=0&modestbranding=1`
+    : null;
+
   return (
     <div
-      className="relative flex-none group select-none transition-all duration-300"
+      className={`relative flex-none group select-none transition-all duration-300 ${
+        isHovered ? "z-40" : "z-10"
+      }`}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -73,7 +91,7 @@ export default function MovieCard({
           </div>
         )}
 
-        {/* Card Thumbnail */}
+        {/* Card Base Thumbnail */}
         <div
           onClick={() => onOpenModal(movie)}
           className={`relative z-10 w-44 md:w-60 aspect-[16/9] rounded-md overflow-hidden bg-neutral-900 cursor-pointer transition-transform duration-300 hover:brightness-105 ${
@@ -109,31 +127,37 @@ export default function MovieCard({
         </div>
       </div>
 
-      {/* Floating Netflix-Style Hover Card with Video Preview */}
+      {/* Floating Netflix-Style Hover Card (Cleanly positioned, fully visible, no clipping) */}
       {isHovered && (
         <div
-          className="hidden md:block absolute -top-24 left-1/2 -translate-x-1/2 z-50 w-80 bg-[#181818] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.95)] overflow-hidden border border-neutral-700/80 animate-scale-up"
+          className={`hidden md:block absolute -top-8 md:-top-12 ${horizontalAlign} z-50 w-72 md:w-80 bg-[#181818] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] overflow-hidden border border-neutral-700/80 animate-scale-up`}
         >
           {/* Top Video Preview / Backdrop */}
           <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
-            {showTrailer && movie.trailerYoutubeId ? (
+            {/* Always have backdrop image as base */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={movie.backdropUrl}
+              alt={movie.title}
+              className={`w-full h-full object-cover transition-transform duration-700 ${
+                isHovered ? "scale-105" : "scale-100"
+              }`}
+            />
+
+            {/* YouTube preview iframe loaded cleanly on sustained hover */}
+            {showTrailer && youtubeEmbedUrl && (
               <iframe
-                src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${movie.trailerYoutubeId}&modestbranding=1&showinfo=0&rel=0&iv_load_policy=3&disablekb=1`}
-                className="w-full h-full object-cover scale-135 pointer-events-none border-0"
+                src={youtubeEmbedUrl}
+                className="absolute inset-0 w-full h-full object-cover scale-135 pointer-events-none border-0 z-10"
                 allow="autoplay; encrypted-media"
+                referrerPolicy="strict-origin-when-cross-origin"
                 tabIndex={-1}
               />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={movie.backdropUrl}
-                alt={movie.title}
-                className="w-full h-full object-cover"
-              />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-transparent to-transparent pointer-events-none" />
 
-            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-transparent to-transparent pointer-events-none z-20" />
+
+            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
               <span className="text-sm font-bold text-white drop-shadow truncate">
                 {movie.title}
               </span>
