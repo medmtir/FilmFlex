@@ -6,8 +6,9 @@ export const metadata: Metadata = {
   description: "La plateforme de streaming nouvelle génération. Profitez de milliers de films, séries et exclusivités en 4K Ultra HD avec reprise de lecture automatique.",
   icons: {
     icon: "/icon.jpg",
-    apple: "/icon.jpg",
+    apple: "/icon-192.png",
   },
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

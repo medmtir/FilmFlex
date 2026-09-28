@@ -1,0 +1,25 @@
+{
+  "name": "FilmFlex - Streaming 4K",
+  "short_name": "FilmFlex",
+  "description": "Regardez des films, séries, anime et cinéma tunisien en streaming 4K Ultra HD.",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e0e12",
+  "theme_color": "#e50914",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
