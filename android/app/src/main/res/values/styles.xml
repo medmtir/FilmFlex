@@ -1,7 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.FilmFlex" parent="android:Theme.NoTitleBar.Fullscreen">
-        <item name="android:windowBackground">#0e0e12</item>
-        <item name="android:statusBarColor">#0e0e12</item>
-        <item name="android:navigationBarColor">#0e0e12</item>
+    <style name="Theme.FilmFlex" parent="@android:style/Theme.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">@color/background</item>
     </style>
 </resources>
