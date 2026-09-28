@@ -384,7 +384,7 @@ export default function HomePage() {
               Résultats pour <span className="text-white">&ldquo;{searchQuery}&rdquo;</span>
             </h2>
             {isSearching && (
-              <span className="text-xs text-[#E50914] animate-pulse">Recherche en direct sur Stremio...</span>
+              <span className="text-xs text-[#E50914] animate-pulse">Recherche en direct sur FilmFlex...</span>
             )}
           </div>
 

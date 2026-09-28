@@ -80,11 +80,10 @@ export default function VideoPlayer({
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [castNotice, setCastNotice] = useState<string | null>(null);
 
-  // Streaming Engine & Server Mode ("native" HTML5/Stremio vs "cloud" Web Stream)
+  // Streaming Engine & Server Mode ("native" HTML5 vs "cloud" Web Stream)
   const [playerMode, setPlayerMode] = useState<"native" | "cloud">("native");
-  const [cloudServer, setCloudServer] = useState<"vidlink" | "vidsrc" | "embedsu">("vidlink");
+  const [cloudServer, setCloudServer] = useState<"vidlink" | "autoembed">("vidlink");
   const [streamUrl, setStreamUrl] = useState<string>("");
-  const [stremioAppUrl, setStremioAppUrl] = useState<string>("");
 
   // Quality & Subtitles
   const [selectedQuality, setSelectedQuality] = useState<string>("auto");
@@ -108,19 +107,15 @@ export default function VideoPlayer({
 
   // Cloud Stream URL Builder
   const getCloudStreamUrl = (server = cloudServer) => {
-    if (server === "vidlink") {
+    if (server === "autoembed") {
       return isSeries
-        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}`
-        : `https://vidlink.pro/movie/${imdbId}`;
+        ? `https://autoembed.co/tv/imdb/${imdbId}-${currentSeason}-${currentEpisode}`
+        : `https://autoembed.co/movie/imdb/${imdbId}`;
     }
-    if (server === "vidsrc") {
-      return isSeries
-        ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
-    }
+    // Default FilmFlex HD 1 (VidLink with FilmFlex Red Theme)
     return isSeries
-      ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
-      : `https://embed.su/embed/movie/${imdbId}`;
+      ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`
+      : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
   };
 
   // Mobile orientation handling
@@ -242,9 +237,6 @@ export default function VideoPlayer({
         }
         if (data.qualityMap) {
           setQualityMap(data.qualityMap);
-        }
-        if (data.stremioAppUrl) {
-          setStremioAppUrl(data.stremioAppUrl);
         }
         if (data.availableQualities && data.availableQualities.length > 0) {
           setAvailableQualities(data.availableQualities);
@@ -655,6 +647,7 @@ export default function VideoPlayer({
               <iframe
                 src={getCloudStreamUrl()}
                 className="w-full h-full border-0"
+                sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
                 allowFullScreen
                 referrerPolicy="origin"
@@ -831,6 +824,18 @@ export default function VideoPlayer({
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Episodes Drawer Toggle Button for Series */}
+              {isSeries && (
+                <button
+                  onClick={() => setShowEpisodesDrawer(!showEpisodesDrawer)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-semibold transition-all hover:text-white"
+                  title="Liste des épisodes"
+                >
+                  <ListVideo className="w-3.5 h-3.5 text-[#E50914]" />
+                  <span>Épisodes</span>
+                </button>
+              )}
+
               {/* Server Switcher Pill */}
               <div className="relative">
                 <button
@@ -843,13 +848,19 @@ export default function VideoPlayer({
                   title="Changer de serveur"
                 >
                   <span className="w-2 h-2 rounded-full bg-[#E50914] animate-pulse" />
-                  <span>{playerMode === "cloud" ? `Serveur Cloud (${cloudServer.toUpperCase()})` : "Stremio Local"}</span>
+                  <span>
+                    {playerMode === "cloud"
+                      ? cloudServer === "autoembed"
+                        ? "Serveur FilmFlex 2"
+                        : "Serveur FilmFlex 1"
+                      : "Serveur Direct"}
+                  </span>
                 </button>
 
                 {activeMenu === "server" && (
-                  <div className="absolute top-10 right-0 w-60 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-xl p-2 shadow-2xl z-50 animate-scale-up space-y-1">
+                  <div className="absolute top-10 right-0 w-64 bg-[#181818]/95 backdrop-blur-md border border-neutral-800 rounded-xl p-2 shadow-2xl z-50 animate-scale-up space-y-1">
                     <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800">
-                      Sélection du Serveur
+                      Serveurs de Diffusion FilmFlex
                     </div>
                     <button
                       onClick={() => {
@@ -860,8 +871,8 @@ export default function VideoPlayer({
                       className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                     >
                       <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur Cloud 1 (VidLink HD)</span>
-                        <span className="text-[10px] text-neutral-400">Recommandé Vercel / Web</span>
+                        <span className="font-semibold text-white">Serveur FilmFlex HD 1</span>
+                        <span className="text-[10px] text-neutral-400">Ultra rapide & fluide</span>
                       </div>
                       {playerMode === "cloud" && cloudServer === "vidlink" && (
                         <Check className="w-4 h-4 text-[#E50914]" />
@@ -870,16 +881,16 @@ export default function VideoPlayer({
                     <button
                       onClick={() => {
                         setPlayerMode("cloud");
-                        setCloudServer("vidsrc");
+                        setCloudServer("autoembed");
                         setActiveMenu(null);
                       }}
                       className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                     >
                       <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur Cloud 2 (VidSrc)</span>
-                        <span className="text-[10px] text-neutral-400">Flux alternatif</span>
+                        <span className="font-semibold text-white">Serveur FilmFlex HD 2</span>
+                        <span className="text-[10px] text-neutral-400">Multi-flux alternatif</span>
                       </div>
-                      {playerMode === "cloud" && cloudServer === "vidsrc" && (
+                      {playerMode === "cloud" && cloudServer === "autoembed" && (
                         <Check className="w-4 h-4 text-[#E50914]" />
                       )}
                     </button>
@@ -892,26 +903,14 @@ export default function VideoPlayer({
                       className="w-full flex items-center justify-between text-xs py-2 px-2 rounded hover:bg-neutral-800 text-left text-neutral-300"
                     >
                       <div className="flex flex-col">
-                        <span className="font-semibold text-white">Serveur Stremio Local</span>
-                        <span className="text-[10px] text-neutral-400">Pour PC avec Stremio actif</span>
+                        <span className="font-semibold text-white">Serveur FilmFlex Direct</span>
+                        <span className="text-[10px] text-neutral-400">Flux haute fidélité original</span>
                       </div>
                       {playerMode === "native" && <Check className="w-4 h-4 text-[#E50914]" />}
                     </button>
                   </div>
                 )}
               </div>
-
-              {/* Open in Stremio App Deep Link if available */}
-              {stremioAppUrl && (
-                <a
-                  href={stremioAppUrl}
-                  className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-semibold transition-all hover:text-white"
-                  title="Ouvrir dans l'application Stremio"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-[#E50914]" />
-                  <span>App Stremio</span>
-                </a>
-              )}
 
               {/* Rotate Screen button: ONLY ON MOBILE (hidden on desktop md:hidden) */}
               <button
@@ -928,6 +927,15 @@ export default function VideoPlayer({
                 <span>1080P HD</span>
               </span>
 
+              {/* Cast / Google Cast / Smart TV Button */}
+              <button
+                onClick={handleCastToTV}
+                className="text-neutral-300 hover:text-[#E50914] transition-colors p-1"
+                title="Diffuser sur Smart TV / Chromecast"
+              >
+                <Cast className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
+
               <button
                 onClick={toggleFullscreen}
                 className="text-neutral-300 hover:text-white transition-colors p-1"
@@ -939,15 +947,15 @@ export default function VideoPlayer({
           </div>
 
           {/* ============================================================ */}
-          {/* BOTTOM CONTROLS BAR: Clean Netflix Red Theme                  */}
+          {/* BOTTOM CONTROLS BAR: Native Player Controls (FilmFlex Red)    */}
           {/* ============================================================ */}
-          <div
-            className={`absolute bottom-0 left-0 right-0 px-4 md:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col gap-2 transition-opacity duration-300 z-30 ${
-              showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-            }`}
-          >
-            {/* Scrubber Timeline Bar (Red) */}
-            {playerMode === "native" && (
+          {playerMode === "native" && (
+            <div
+              className={`absolute bottom-0 left-0 right-0 px-4 md:px-6 py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent flex flex-col gap-2 transition-opacity duration-300 z-30 ${
+                showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
+            >
+              {/* Scrubber Timeline Bar (Red) */}
               <div className="flex items-center gap-3 w-full">
                 <span className="text-[11px] font-mono text-neutral-400 w-14 text-right">
                   {formatTime(currentTime)}
@@ -981,44 +989,29 @@ export default function VideoPlayer({
                   -{formatTime(remainingTime)}
                 </span>
               </div>
-            )}
 
-            {/* Bottom Controls Row */}
-            <div className="flex items-center justify-between pt-1">
-              {/* Left Controls: Play/Pause, Next Episode, Volume Slider */}
-              <div className="flex items-center gap-4 md:gap-5">
-                {playerMode === "native" && (
+              {/* Bottom Controls Row */}
+              <div className="flex items-center justify-between pt-1">
+                {/* Left Controls: Play/Pause, Next Episode, Volume Slider */}
+                <div className="flex items-center gap-4 md:gap-5">
                   <button
                     onClick={togglePlay}
                     className="text-neutral-300 hover:text-white transition-colors"
                   >
                     {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 fill-white" />}
                   </button>
-                )}
 
-                {isSeries && (
-                  <button
-                    onClick={handleNextEpisode}
-                    className="text-neutral-300 hover:text-white transition-colors"
-                    title="Épisode Suivant"
-                  >
-                    <SkipForward className="w-5 h-5" />
-                  </button>
-                )}
+                  {isSeries && (
+                    <button
+                      onClick={handleNextEpisode}
+                      className="text-neutral-300 hover:text-white transition-colors"
+                      title="Épisode Suivant"
+                    >
+                      <SkipForward className="w-5 h-5" />
+                    </button>
+                  )}
 
-                {/* Episodes Drawer Toggle Button */}
-                {isSeries && (
-                  <button
-                    onClick={() => setShowEpisodesDrawer(!showEpisodesDrawer)}
-                    className="flex items-center gap-1.5 text-xs text-neutral-300 hover:text-white px-2.5 py-1 rounded bg-neutral-900 border border-neutral-700 hover:border-neutral-500 transition-colors"
-                  >
-                    <ListVideo className="w-4 h-4 text-[#E50914]" />
-                    <span className="hidden sm:inline">Épisodes</span>
-                  </button>
-                )}
-
-                {/* Volume & Mute */}
-                {playerMode === "native" && (
+                  {/* Volume & Mute */}
                   <div className="flex items-center gap-2 group/vol">
                     <button
                       onClick={toggleMute}
@@ -1036,13 +1029,11 @@ export default function VideoPlayer({
                       className="w-16 md:w-24 h-1 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-[#E50914] hidden sm:block"
                     />
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Right Controls: Quality, Cast, Speed, Subtitles, PiP */}
-              <div className="flex items-center gap-3 md:gap-4">
-                {/* 1. Quality Selector */}
-                {playerMode === "native" && (
+                {/* Right Controls: Quality, Speed, Subtitles, PiP */}
+                <div className="flex items-center gap-3 md:gap-4">
+                  {/* 1. Quality Selector */}
                   <div className="relative">
                     <button
                       onClick={() => setActiveMenu(activeMenu === "quality" ? null : "quality")}
@@ -1075,19 +1066,8 @@ export default function VideoPlayer({
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* 2. Authentic YouTube / Google Cast Button */}
-                <button
-                  onClick={handleCastToTV}
-                  className="text-neutral-300 hover:text-[#E50914] transition-colors p-1"
-                  title="Diffuser sur Smart TV / Chromecast"
-                >
-                  <Cast className="w-5 h-5" />
-                </button>
-
-                {/* 3. Playback Speed */}
-                {playerMode === "native" && (
+                  {/* 2. Playback Speed */}
                   <div className="relative">
                     <button
                       onClick={() => setActiveMenu(activeMenu === "speed" ? null : "speed")}
@@ -1121,10 +1101,8 @@ export default function VideoPlayer({
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* 4. Real OpenSubtitles Selector */}
-                {playerMode === "native" && (
+                  {/* 3. Real OpenSubtitles Selector */}
                   <div className="relative">
                     <button
                       onClick={() => setActiveMenu(activeMenu === "subtitles" ? null : "subtitles")}
@@ -1172,10 +1150,8 @@ export default function VideoPlayer({
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* 5. Picture in Picture */}
-                {playerMode === "native" && (
+                  {/* 4. Picture in Picture */}
                   <button
                     onClick={togglePiP}
                     className="text-neutral-300 hover:text-white transition-colors p-1 hidden sm:block"
@@ -1183,10 +1159,10 @@ export default function VideoPlayer({
                   >
                     <PictureInPicture2 className="w-4 h-4" />
                   </button>
-                )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* ============================================================ */}
           {/* SLIDE-OVER EPISODES DRAWER INSIDE THE PLAYER                 */}
