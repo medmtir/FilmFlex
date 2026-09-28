@@ -13,8 +13,15 @@ import {
   Sparkles,
   Info,
   Film,
+  Loader2,
 } from "lucide-react";
 import { Movie, Episode } from "@/types";
+import {
+  startDownload,
+  isItemDownloaded,
+  isItemDownloading,
+  onDownloadsUpdated,
+} from "@/lib/downloadManager";
 
 interface MobileMovieDetailsSheetProps {
   movie: Movie | null;
@@ -90,33 +97,43 @@ export default function MobileMovieDetailsSheet({
     }
   }, [movie, isSeries]);
 
+  const [, setDownloadVersion] = useState(0);
+
+  useEffect(() => {
+    const unsub = onDownloadsUpdated(() => {
+      setDownloadVersion((v) => v + 1);
+    });
+    return () => unsub();
+  }, []);
+
   if (!movie) return null;
+
+  const isMovieDownloaded = isItemDownloaded(movie.id);
+  const isMovieDownloading = isItemDownloading(movie.id);
 
   const currentSeasonEpisodes = episodes.filter((e) => e.season === selectedSeason);
   const availableSeasons = Array.from(new Set(episodes.map((e) => e.season))).sort(
     (a, b) => a - b
   );
 
-  const handleDownloadClick = (ep?: Episode) => {
+  const handleDownloadClick = async (ep?: Episode) => {
+    const downloadId = ep ? `${movie.id}:${ep.season}:${ep.episode}` : movie.id;
     const itemTitle = ep ? `${movie.title} (${ep.title})` : movie.title;
-    setDownloadSuccessNotice(`Téléchargement lancé : ${itemTitle}`);
+
+    if (isItemDownloaded(downloadId)) {
+      setDownloadSuccessNotice(`"${itemTitle}" est déjà prêt dans l'application pour le visionnage hors-ligne !`);
+      setTimeout(() => setDownloadSuccessNotice(null), 3500);
+      return;
+    }
+
+    setDownloadSuccessNotice(`Téléchargement de "${itemTitle}" dans l'application en cours...`);
     setTimeout(() => setDownloadSuccessNotice(null), 3500);
 
     if (onDownload) {
       onDownload(movie, ep);
-      return;
     }
 
-    // Direct download trigger (Stremio style)
-    const streamDownloadUrl = `/api/stream/${movie.imdbId || movie.id}?quality=1080p${
-      ep ? `&season=${ep.season}&episode=${ep.episode}` : ""
-    }`;
-    const a = document.createElement("a");
-    a.href = streamDownloadUrl;
-    a.download = `${movie.title.replace(/\s+/g, "_")}${ep ? `_S${ep.season}E${ep.episode}` : ""}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    await startDownload(movie, ep);
   };
 
   return (
@@ -183,6 +200,36 @@ export default function MobileMovieDetailsSheet({
           >
             <Play className="w-4 h-4 fill-white" />
             <span>PLAY</span>
+          </button>
+
+          {/* Full-Width ⬇ TÉLÉCHARGER Button */}
+          <button
+            onClick={() => handleDownloadClick()}
+            disabled={isMovieDownloading}
+            className={`w-full py-2.5 font-bold text-xs uppercase tracking-wider rounded-md flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+              isMovieDownloaded
+                ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-400"
+                : isMovieDownloading
+                ? "bg-neutral-800 text-neutral-300 border-neutral-700 animate-pulse"
+                : "bg-neutral-800/90 hover:bg-neutral-750 text-white border-neutral-700"
+            }`}
+          >
+            {isMovieDownloaded ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-400" />
+                <span>Téléchargé (Prêt hors-ligne)</span>
+              </>
+            ) : isMovieDownloading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-[#E50914]" />
+                <span>Téléchargement dans l&apos;application...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4 text-white" />
+                <span>Télécharger</span>
+              </>
+            )}
           </button>
 
           {/* Download Notification */}
@@ -359,16 +406,30 @@ export default function MobileMovieDetailsSheet({
                             {ep.title}
                           </h4>
                           {/* Download Episode Button */}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDownloadClick(ep);
-                            }}
-                            className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
-                            title="Télécharger l'épisode"
-                          >
-                            <Download className="w-4 h-4" />
-                          </button>
+                          {(() => {
+                            const epDownloadId = `${movie.id}:${ep.season}:${ep.episode}`;
+                            const isEpDownloaded = isItemDownloaded(epDownloadId);
+                            const isEpDownloading = isItemDownloading(epDownloadId);
+                            return (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadClick(ep);
+                                }}
+                                disabled={isEpDownloading}
+                                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                                title={isEpDownloaded ? "Épisode téléchargé dans l'application" : "Télécharger l'épisode hors-ligne"}
+                              >
+                                {isEpDownloaded ? (
+                                  <Check className="w-4 h-4 text-emerald-400" />
+                                ) : isEpDownloading ? (
+                                  <Loader2 className="w-4 h-4 text-[#E50914] animate-spin" />
+                                ) : (
+                                  <Download className="w-4 h-4" />
+                                )}
+                              </button>
+                            );
+                          })()}
                         </div>
 
                         <span className="text-[10px] text-neutral-400 font-mono">

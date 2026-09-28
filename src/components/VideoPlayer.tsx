@@ -19,6 +19,7 @@ import {
 import { Movie, Profile, Episode } from "@/types";
 import { saveMovieProgress, getMovieResumeTime } from "@/lib/storage";
 import { startWatchingSession, stopWatchingSession } from "@/lib/auth";
+import { isItemDownloaded, getOfflineVideoUrl } from "@/lib/downloadManager";
 
 interface VideoPlayerProps {
   movie: Movie;
@@ -29,7 +30,7 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "vidlink" | "torrentio" | "embedsu" | "mondial" | "tunisien";
+type ServerType = "vidlink" | "torrentio" | "embedsu" | "mondial" | "tunisien" | "offline";
 
 interface ServerOption {
   id: ServerType;
@@ -68,6 +69,12 @@ const SERVER_OPTIONS: ServerOption[] = [
     name: "Serveur 5 (Cinéma Tunisien Officiel)",
     badge: "🇹🇳 Tunisien HD",
     description: "Diffusion officielle directe pour Choufly Hal, Nouba et films tunisiens",
+  },
+  {
+    id: "offline",
+    name: "Serveur Hors-Ligne (Stockage App)",
+    badge: "💾 Hors-Ligne",
+    description: "Lecture directe depuis la mémoire interne de l'application sans aucune connexion Internet ni Wi-Fi",
   },
 ];
 
@@ -127,6 +134,21 @@ export default function VideoPlayer({
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
+
+  const downloadId = isSeries ? `${movie.id}:${currentSeason}:${currentEpisode}` : movie.id;
+  const isDownloaded = isItemDownloaded(downloadId) || isItemDownloaded(movie.id);
+  const [offlineVideoUrl, setOfflineVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    getOfflineVideoUrl(downloadId).then((url) => {
+      if (url) {
+        setOfflineVideoUrl(url);
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          setActiveServer("offline");
+        }
+      }
+    });
+  }, [downloadId]);
 
   // Save progress for "Reprendre la lecture"
   useEffect(() => {
@@ -403,7 +425,11 @@ export default function VideoPlayer({
   };
 
   const currentSeasonEpisodes = episodesList.filter((e) => e.season === currentSeason);
-  const availableServers = SERVER_OPTIONS.filter((srv) => srv.id !== "tunisien" || isTunisian);
+  const availableServers = SERVER_OPTIONS.filter((srv) => {
+    if (srv.id === "tunisien") return isTunisian;
+    if (srv.id === "offline") return isDownloaded || Boolean(offlineVideoUrl) || (typeof navigator !== "undefined" && !navigator.onLine);
+    return true;
+  });
   const activeServerInfo = availableServers.find((s) => s.id === activeServer) || availableServers[0];
 
   return (
@@ -440,15 +466,33 @@ export default function VideoPlayer({
         /* 2. CLOUD HD VIDEO PLAYER (100% FULL SCREEN & INTERACTIVE)    */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {/* Iframe with direct touch/click interaction and ad-blocking sandbox */}
-          <iframe
-            key={`${activeServer}-${imdbId}-${currentSeason}-${currentEpisode}`}
-            src={getStreamUrl()}
-            className="w-full h-full border-0 absolute inset-0 z-10"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-            allowFullScreen
-            referrerPolicy="origin"
-          />
+          {activeServer === "offline" ? (
+            <video
+              key={offlineVideoUrl || "offline-video"}
+              src={offlineVideoUrl || movie.videoUrl || "/sample.mp4"}
+              controls
+              autoPlay
+              playsInline
+              className="w-full h-full object-contain absolute inset-0 z-10 bg-black"
+            />
+          ) : (
+            <iframe
+              key={`${activeServer}-${imdbId}-${currentSeason}-${currentEpisode}`}
+              src={getStreamUrl()}
+              className="w-full h-full border-0 absolute inset-0 z-10"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+              allowFullScreen
+              referrerPolicy="origin"
+            />
+          )}
+
+          {/* Offline Playback Notification Badge */}
+          {activeServer === "offline" && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-emerald-950/90 border border-emerald-500/60 text-emerald-300 text-xs font-semibold px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 pointer-events-none z-40 animate-fade-in">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Lecture Hors-Ligne (Stockage Interne FilmFlex)</span>
+            </div>
+          )}
 
           {/* Resumed Notification Badge */}
           {resumedNotice && (

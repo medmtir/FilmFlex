@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download } from "lucide-react";
+import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download, Loader2 } from "lucide-react";
 import { Movie, Episode } from "@/types";
+import { startDownload, isItemDownloaded, isItemDownloading, onDownloadsUpdated } from "@/lib/downloadManager";
 
 interface MovieModalProps {
   movie: Movie | null;
@@ -29,21 +30,18 @@ export default function MovieModal({
   const [notice, setNotice] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
 
-  const handleDownload = (ep?: Episode) => {
+  const handleDownload = async (ep?: Episode) => {
     if (!movie) return;
     const itemTitle = ep ? `${movie.title} - S${ep.season}E${ep.episode}` : movie.title;
-    setNotice(`Téléchargement lancé : ${itemTitle}`);
+    const downloadId = ep ? `${movie.id}:${ep.season}:${ep.episode}` : movie.id;
+    if (isItemDownloaded(downloadId)) {
+      setNotice(`"${itemTitle}" est déjà prêt dans l'application pour le visionnage hors-ligne.`);
+      setTimeout(() => setNotice(null), 3500);
+      return;
+    }
+    setNotice(`Téléchargement de "${itemTitle}" dans l'application en cours...`);
     setTimeout(() => setNotice(null), 3500);
-
-    const streamDownloadUrl = `/api/stream/${movie.imdbId || movie.id}?quality=1080p${
-      ep ? `&season=${ep.season}&episode=${ep.episode}` : ""
-    }`;
-    const a = document.createElement("a");
-    a.href = streamDownloadUrl;
-    a.download = `${movie.title.replace(/\s+/g, "_")}${ep ? `_S${ep.season}E${ep.episode}` : ""}.mp4`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    await startDownload(movie, ep);
   };
 
   const handleShare = () => {

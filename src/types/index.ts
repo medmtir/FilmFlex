@@ -98,3 +98,22 @@ export interface CategoryRow {
   isTop10?: boolean;
   isContinueWatching?: boolean;
 }
+
+export interface DownloadedItem {
+  id: string;
+  movieId: string;
+  title: string;
+  season?: number;
+  episode?: number;
+  episodeTitle?: string;
+  posterUrl: string;
+  backdropUrl: string;
+  duration: string;
+  quality: string;
+  sizeFormatted: string;
+  downloadedAt: string;
+  status: "downloading" | "completed" | "error";
+  progress: number; // 0 - 100
+  offlineMediaKey?: string;
+}
+
