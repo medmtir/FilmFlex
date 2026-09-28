@@ -1,5 +1,10 @@
 import { Profile, UserAccount, WatchProgress, Movie } from "@/types";
 import { DEFAULT_PROFILES, INITIAL_MOVIES } from "./constants";
+import {
+  syncProgressToSupabase,
+  syncMyListToSupabase,
+  syncProfileToSupabase,
+} from "./supabase";
 
 const USER_STORAGE_KEY = "filmflex_user_session";
 const PROGRESS_STORAGE_PREFIX = "filmflex_progress_";
@@ -61,6 +66,12 @@ export function updateProfile(profileId: string, updates: Partial<Profile>): Use
   const user = getStoredUser();
   user.profiles = user.profiles.map((p) => (p.id === profileId ? { ...p, ...updates } : p));
   saveUser(user);
+
+  const updatedProfile = user.profiles.find((p) => p.id === profileId);
+  if (updatedProfile) {
+    syncProfileToSupabase(updatedProfile).catch(() => {});
+  }
+
   return user;
 }
 
@@ -71,12 +82,26 @@ export function setActiveProfile(profileId: string): UserAccount {
   return user;
 }
 
-// Watch Progress (Resume playback / Continue watching)
+// Watch Progress (Resume playback / Continue watching) - Strictly Deduplicated
 export function getProfileProgress(profileId: string): WatchProgress[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !profileId) return [];
   try {
     const raw = localStorage.getItem(`${PROGRESS_STORAGE_PREFIX}${profileId}`);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const list: WatchProgress[] = JSON.parse(raw);
+
+    // Strict deduplication by movieId preserving newest watched order
+    const seen = new Set<string>();
+    const uniqueList: WatchProgress[] = [];
+
+    for (const item of list) {
+      if (item && item.movieId && !seen.has(item.movieId)) {
+        seen.add(item.movieId);
+        uniqueList.push(item);
+      }
+    }
+
+    return uniqueList;
   } catch {
     return [];
   }
@@ -93,7 +118,6 @@ export function saveMovieProgress(
     const list = getProfileProgress(profileId);
     const percentage = totalSeconds > 0 ? Math.round((currentSeconds / totalSeconds) * 100) : 0;
 
-    const existingIndex = list.findIndex((item) => item.movieId === movieId);
     const record: WatchProgress = {
       movieId,
       currentSeconds: Math.floor(currentSeconds),
@@ -102,14 +126,16 @@ export function saveMovieProgress(
       lastWatchedAt: new Date().toISOString(),
     };
 
-    if (existingIndex > -1) {
-      list[existingIndex] = record;
-    } else {
-      list.unshift(record);
-    }
+    // Filter out previous entry to eliminate any duplicate and place at the head
+    const filtered = list.filter((item) => item.movieId !== movieId);
+    filtered.unshift(record);
 
-    // Keep only last 20 watched movies
-    localStorage.setItem(`${PROGRESS_STORAGE_PREFIX}${profileId}`, JSON.stringify(list.slice(0, 20)));
+    // Keep only last 25 watched movies
+    const cleaned = filtered.slice(0, 25);
+    localStorage.setItem(`${PROGRESS_STORAGE_PREFIX}${profileId}`, JSON.stringify(cleaned));
+
+    // Asynchronously synchronize to Supabase
+    syncProgressToSupabase(profileId, record).catch(() => {});
   } catch (e) {
     console.error("Failed to save movie progress", e);
   }
@@ -125,31 +151,38 @@ export function getMovieResumeTime(profileId: string, movieId: string): number {
   return 0;
 }
 
-// My List (Bookmarks)
+// My List (Bookmarks) - Strictly Deduplicated
 export function getMyList(profileId: string): string[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined" || !profileId) return [];
   try {
     const raw = localStorage.getItem(`${MY_LIST_STORAGE_PREFIX}${profileId}`);
-    return raw ? JSON.parse(raw) : ["m_dune2", "m_inception"];
+    const list: string[] = raw ? JSON.parse(raw) : ["m_dune2", "m_inception"];
+    return Array.from(new Set(list));
   } catch {
     return [];
   }
 }
 
 export function toggleMyList(profileId: string, movieId: string): boolean {
-  if (typeof window === "undefined") return false;
+  if (typeof window === "undefined" || !profileId || !movieId) return false;
   try {
     const list = getMyList(profileId);
     let updated: string[];
     let added = false;
+
     if (list.includes(movieId)) {
       updated = list.filter((id) => id !== movieId);
       added = false;
     } else {
-      updated = [movieId, ...list];
+      updated = [movieId, ...list.filter((id) => id !== movieId)];
       added = true;
     }
+
     localStorage.setItem(`${MY_LIST_STORAGE_PREFIX}${profileId}`, JSON.stringify(updated));
+
+    // Asynchronously synchronize to Supabase
+    syncMyListToSupabase(profileId, movieId, added).catch(() => {});
+
     return added;
   } catch {
     return false;

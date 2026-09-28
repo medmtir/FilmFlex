@@ -19,6 +19,10 @@ import {
   getMyList,
   toggleMyList as toggleMyListStorage,
 } from "@/lib/storage";
+import {
+  fetchProgressFromSupabase,
+  fetchMyListFromSupabase,
+} from "@/lib/supabase";
 
 export default function HomePage() {
   // 1. User & Profiles State
@@ -65,11 +69,29 @@ export default function HomePage() {
     }
   }, []);
 
-  // Update profile data when active profile changes
+  // Update profile data when active profile changes (LocalStorage + Supabase cloud sync)
   useEffect(() => {
     if (activeProfile) {
-      setProgressList(getProfileProgress(activeProfile.id));
+      const localProgress = getProfileProgress(activeProfile.id);
+      setProgressList(localProgress);
       setMyListIds(getMyList(activeProfile.id));
+
+      // Asynchronously sync with Supabase cloud
+      fetchProgressFromSupabase(activeProfile.id)
+        .then((remoteProgress) => {
+          if (remoteProgress && remoteProgress.length > 0) {
+            setProgressList(remoteProgress);
+          }
+        })
+        .catch(() => {});
+
+      fetchMyListFromSupabase(activeProfile.id)
+        .then((remoteList) => {
+          if (remoteList && remoteList.length > 0) {
+            setMyListIds(remoteList);
+          }
+        })
+        .catch(() => {});
     }
   }, [activeProfile]);
 
@@ -203,16 +225,48 @@ export default function HomePage() {
     setShowPaywall(false);
   };
 
-  // Movies list pool
-  const allAvailableMovies = [...liveMovies, ...actionMovies, ...scifiMovies, ...comedyMovies, ...seriesMovies];
+  // Movies list pool - strictly unique
+  const uniqueMoviesMap = new Map<string, Movie>();
+  for (const m of [
+    ...liveMovies,
+    ...actionMovies,
+    ...scifiMovies,
+    ...comedyMovies,
+    ...seriesMovies,
+    ...INITIAL_MOVIES,
+    ...INITIAL_SERIES,
+  ]) {
+    if (m && m.id && !uniqueMoviesMap.has(m.id)) {
+      uniqueMoviesMap.set(m.id, m);
+    }
+  }
+  const allAvailableMovies = Array.from(uniqueMoviesMap.values());
   
-  // Continue Watching Movies
-  const continueWatchingMovies = allAvailableMovies.filter((m) =>
-    progressList.some((p) => p.movieId === m.id && p.percentage < 95)
-  );
+  // Continue Watching Movies - strictly unique, ordered by most recently watched
+  const continueWatchingMovies: Movie[] = [];
+  const seenContinueIds = new Set<string>();
+  for (const p of progressList) {
+    if (p.percentage < 95 && !seenContinueIds.has(p.movieId)) {
+      const foundMovie = uniqueMoviesMap.get(p.movieId);
+      if (foundMovie) {
+        seenContinueIds.add(p.movieId);
+        continueWatchingMovies.push(foundMovie);
+      }
+    }
+  }
 
-  // My List Movies
-  const myListMovies = allAvailableMovies.filter((m) => myListIds.includes(m.id));
+  // My List Movies - strictly unique
+  const myListMovies: Movie[] = [];
+  const seenMyListIds = new Set<string>();
+  for (const id of myListIds) {
+    if (!seenMyListIds.has(id)) {
+      const foundMovie = uniqueMoviesMap.get(id);
+      if (foundMovie) {
+        seenMyListIds.add(id);
+        myListMovies.push(foundMovie);
+      }
+    }
+  }
 
   // Top 10 list
   const top10Movies = liveMovies.slice(0, 10).map((m, idx) => ({

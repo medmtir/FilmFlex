@@ -111,19 +111,31 @@ export default function VideoPlayer({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
 
-  // Auto-request landscape on mobile mount
+  // Auto-request landscape and orientation handling for mobile
   useEffect(() => {
+    const handleOrientation = () => {
+      if (typeof window !== "undefined" && window.innerWidth > window.innerHeight) {
+        // Device is already physically in landscape, no CSS rotation needed
+        setIsLandscapeMode(false);
+      }
+    };
+
     try {
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const orient = screen.orientation as any;
         if (orient && typeof orient.lock === "function") {
-          orient.lock("landscape").then(() => setIsLandscapeMode(true)).catch(() => {});
+          orient.lock("landscape").catch(() => {});
         }
       }
     } catch {}
 
+    window.addEventListener("resize", handleOrientation);
+    window.addEventListener("orientationchange", handleOrientation);
+
     return () => {
+      window.removeEventListener("resize", handleOrientation);
+      window.removeEventListener("orientationchange", handleOrientation);
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const orient = screen.orientation as any;
@@ -134,17 +146,19 @@ export default function VideoPlayer({
     };
   }, []);
 
-  // Mobile toggle rotate (Screen Orientation API + CSS transform fallback)
+  // Mobile-only toggle rotate (Screen Orientation API + CSS transform fallback)
   const toggleRotate = () => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) return;
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
       if (orient && typeof orient.lock === "function") {
         if (!isLandscapeMode) {
           orient.lock("landscape").then(() => {
-            setIsLandscapeMode(true);
+            // Screen rotated natively
           }).catch(() => {
-            setIsLandscapeMode((prev) => !prev);
+            setIsLandscapeMode(true);
           });
           return;
         } else {
@@ -609,7 +623,7 @@ export default function VideoPlayer({
       onMouseMove={handleMouseMove}
       className={`fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden text-white font-sans transition-all duration-300 ${
         isLandscapeMode
-          ? "rotate-90 origin-top-left !w-[100dvh] !h-[100dvw] translate-x-[100dvw]"
+          ? "rotate-90 origin-top-left !w-[100dvh] !h-[100dvw] translate-x-[100dvw] md:rotate-0 md:!w-full md:!h-full md:translate-x-0"
           : "w-full h-full"
       }`}
     >
@@ -1086,10 +1100,10 @@ export default function VideoPlayer({
                   <PictureInPicture2 className="w-4 h-4" />
                 </button>
 
-                {/* 8. 🔄 Tourner l'écran */}
+                {/* 8. 🔄 Tourner l'écran (Uniquement sur Téléphone / Mobile) */}
                 <button
                   onClick={toggleRotate}
-                  className="text-neutral-300 hover:text-white transition-colors p-1"
+                  className="text-neutral-300 hover:text-white transition-colors p-1 md:hidden"
                   title="Tourner l'écran (Paysage / Portrait)"
                 >
                   <RotateCw className="w-4 h-4 text-purple-400" />
