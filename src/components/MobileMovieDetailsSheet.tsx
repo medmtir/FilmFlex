@@ -164,32 +164,25 @@ export default function MobileMovieDetailsSheet({
             </div>
           </div>
 
-          {/* Title & Metadata */}
-          <div className="text-center space-y-1.5">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">
-              {movie.title}
-            </h1>
-
-            <div className="flex items-center justify-center gap-2.5 text-xs text-neutral-400 font-medium">
-              <span className="text-emerald-400 font-bold">Recommandé</span>
-              <span>•</span>
-              <span>{movie.releaseYear}</span>
-              <span>•</span>
-              <span className="bg-neutral-800 px-1.5 py-0.5 rounded text-[10px] text-neutral-300">
-                {movie.ageRating || "16+"}
-              </span>
-              <span>•</span>
-              <span>{movie.duration}</span>
-            </div>
+          {/* Metadata Row matching Screenshot: 👍 Year TV-MA Duration */}
+          <div className="flex items-center justify-center gap-2.5 text-xs text-neutral-300 font-semibold pt-1">
+            <span className="flex items-center gap-1 text-white">
+              <ThumbsUp className="w-3.5 h-3.5 fill-white" />
+            </span>
+            <span>{movie.releaseYear}</span>
+            <span className="bg-neutral-800 text-neutral-300 font-mono text-[10px] px-1.5 py-0.5 rounded border border-neutral-700">
+              {movie.ageRating || "TV-MA"}
+            </span>
+            <span>{movie.duration}</span>
           </div>
 
-          {/* Big Red Full-Width ▶ PLAY Button (Exact match to Screen 2) */}
+          {/* Big Red Full-Width ▶ PLAY Button (Exact match to media_1790623064106.png) */}
           <button
-            onClick={() => onPlay(movie, 1, 1)}
-            className="w-full py-3.5 bg-[#E50914] hover:bg-[#b80710] active:scale-[0.98] text-white font-black text-sm uppercase tracking-wider rounded-xl shadow-xl shadow-red-950/60 flex items-center justify-center gap-2.5 transition-all cursor-pointer"
+            onClick={() => onPlay(movie, selectedSeason, 1)}
+            className="w-full py-3 bg-[#E50914] hover:bg-[#b80710] active:scale-[0.98] text-white font-black text-sm uppercase tracking-wider rounded-md shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <Play className="w-5 h-5 fill-white" />
-            <span>Lecture</span>
+            <Play className="w-4 h-4 fill-white" />
+            <span>PLAY</span>
           </button>
 
           {/* Download Notification */}
@@ -200,60 +193,58 @@ export default function MobileMovieDetailsSheet({
             </div>
           )}
 
-          {/* Synopsis Description */}
-          <div className="space-y-1">
+          {/* Episode Info & Synopsis Description */}
+          <div className="space-y-1.5 text-left pt-1">
             {isSeries && currentSeasonEpisodes.length > 0 && (
-              <p className="text-xs font-bold text-white">
-                S{selectedSeason}:E1 {currentSeasonEpisodes[0].title}
-              </p>
+              <h3 className="text-sm font-extrabold text-white">
+                S{selectedSeason}:E1 {currentSeasonEpisodes[0].title.replace(/^\d+\.\s*/, "")}
+              </h3>
             )}
             <p className="text-xs text-neutral-300 leading-relaxed">
               {movie.description}
             </p>
+            {(movie.cast || movie.director) && (
+              <div className="text-[11px] text-neutral-400 space-y-0.5 pt-1">
+                {movie.cast && movie.cast.length > 0 && (
+                  <p>
+                    <span className="text-neutral-500 font-medium">Cast: </span>
+                    {movie.cast.slice(0, 3).join(", ")}
+                  </p>
+                )}
+                {movie.director && (
+                  <p>
+                    <span className="text-neutral-500 font-medium">Creator: </span>
+                    {movie.director}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Cast & Director */}
-          {(movie.cast || movie.director) && (
-            <div className="text-[11px] text-neutral-400 space-y-0.5 pt-1">
-              {movie.cast && movie.cast.length > 0 && (
-                <p>
-                  <span className="text-neutral-500">Avec : </span>
-                  {movie.cast.slice(0, 3).join(", ")}
-                </p>
-              )}
-              {movie.director && (
-                <p>
-                  <span className="text-neutral-500">Créateur / Réalisateur : </span>
-                  {movie.director}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Action Row: + My List | 👍 Rate | ↗ Share | ⬇ Download (Exact match to Screen 2) */}
-          <div className="flex items-center justify-around py-3 border-y border-neutral-800/80 text-neutral-400">
+          {/* Action Row: + My List | 👍 Rated | ↗ Share (Exact 3 items matching screenshot) */}
+          <div className="flex items-center justify-around py-3 border-y border-neutral-800 text-neutral-400">
             {/* My List */}
             <button
               onClick={() => onToggleMyList(movie)}
               className="flex flex-col items-center gap-1 hover:text-white transition-colors cursor-pointer"
             >
               {isInMyList ? (
-                <Check className="w-5 h-5 text-emerald-400" />
+                <Check className="w-5 h-5 text-white" />
               ) : (
-                <Plus className="w-5 h-5" />
+                <Plus className="w-5 h-5 text-neutral-300" />
               )}
-              <span className="text-[10px] font-medium">Ma Liste</span>
+              <span className="text-[10px] font-medium">My List</span>
             </button>
 
-            {/* Rate */}
+            {/* Rated */}
             <button
               onClick={() => setIsLiked(!isLiked)}
               className={`flex flex-col items-center gap-1 transition-colors cursor-pointer ${
-                isLiked ? "text-[#E50914]" : "hover:text-white"
+                isLiked ? "text-white font-bold" : "hover:text-white"
               }`}
             >
-              <ThumbsUp className={`w-5 h-5 ${isLiked ? "fill-[#E50914]" : ""}`} />
-              <span className="text-[10px] font-medium">J&apos;aime</span>
+              <ThumbsUp className={`w-5 h-5 ${isLiked ? "fill-white text-white" : "text-neutral-300"}`} />
+              <span className="text-[10px] font-medium">{isLiked ? "Rated" : "Rate"}</span>
             </button>
 
             {/* Share */}
@@ -275,19 +266,13 @@ export default function MobileMovieDetailsSheet({
               }}
               className="flex flex-col items-center gap-1 hover:text-white transition-colors cursor-pointer"
             >
-              <Share2 className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Partager</span>
-            </button>
-
-            {/* Download */}
-            <button
-              onClick={() => handleDownloadClick()}
-              className="flex flex-col items-center gap-1 hover:text-white transition-colors cursor-pointer"
-            >
-              <Download className="w-5 h-5" />
-              <span className="text-[10px] font-medium">Télécharger</span>
+              <Share2 className="w-5 h-5 text-neutral-300" />
+              <span className="text-[10px] font-medium">Share</span>
             </button>
           </div>
+
+          {/* Red Accent Divider matching media_1790623064106.png */}
+          <div className="w-full h-[2px] bg-[#E50914] -mt-2 mb-1" />
 
           {/* Tabs: ÉPISODES | BANDES-ANNONCES & PLUS */}
           <div className="pt-2">

@@ -29,7 +29,7 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "torrentio" | "vidlink" | "vidsrc" | "embed2" | "embedsu";
+type ServerType = "vidlink" | "torrentio" | "embedsu" | "direct";
 
 interface ServerOption {
   id: ServerType;
@@ -43,31 +43,25 @@ const SERVER_OPTIONS: ServerOption[] = [
     id: "vidlink",
     name: "Serveur 1 (Netflix Ultra HD)",
     badge: "⭐ Défaut (Netflix)",
-    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR et streaming instantané sans coupure",
+    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR • Zéro pub ni redirection",
   },
   {
     id: "torrentio",
     name: "Serveur 2 (Torrentio CDN 4K)",
     badge: "Torrentio 4K",
-    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p",
-  },
-  {
-    id: "vidsrc",
-    name: "Serveur 3 (FilmFlex VidSrc Pro)",
-    badge: "Mondial",
-    description: "Serveur mondial direct très fluide",
-  },
-  {
-    id: "embed2",
-    name: "Serveur 4 (FilmFlex 2Embed)",
-    badge: "Backup HD",
-    description: "Alternative stable pour séries et animés",
+    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p sans pub",
   },
   {
     id: "embedsu",
-    name: "Serveur 5 (FilmFlex Embed.su)",
+    name: "Serveur 3 (FilmFlex Multi-Langues)",
     badge: "Multi-Langues",
-    description: "Sous-titres multi-langues et streaming instantané",
+    description: "Sous-titres multi-langues et streaming instantané sans pub",
+  },
+  {
+    id: "direct",
+    name: "Serveur 4 (FilmFlex VIP Direct)",
+    badge: "Direct VIP",
+    description: "Flux vidéo direct HTML5 haute vitesse sans aucun intermédiaire",
   },
 ];
 
@@ -159,11 +153,19 @@ export default function VideoPlayer({
     };
 
     try {
-      if (typeof window !== "undefined" && window.innerWidth < 768) {
+      if (typeof window !== "undefined") {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const orient = screen.orientation as any;
-        if (orient && typeof orient.lock === "function") {
-          orient.lock("landscape").catch(() => {});
+        const nativeApp = (window as any).FilmFlexNative;
+        if (nativeApp && typeof nativeApp.enterVideoMode === "function") {
+          nativeApp.enterVideoMode();
+        }
+
+        if (window.innerWidth < 768) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const orient = screen.orientation as any;
+          if (orient && typeof orient.lock === "function") {
+            orient.lock("landscape").catch(() => {});
+          }
         }
       }
     } catch {}
@@ -175,10 +177,17 @@ export default function VideoPlayer({
       window.removeEventListener("resize", handleOrientation);
       window.removeEventListener("orientationchange", handleOrientation);
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const orient = screen.orientation as any;
-        if (orient && typeof orient.unlock === "function") {
-          orient.unlock();
+        if (typeof window !== "undefined") {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const nativeApp = (window as any).FilmFlexNative;
+          if (nativeApp && typeof nativeApp.exitVideoMode === "function") {
+            nativeApp.exitVideoMode();
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const orient = screen.orientation as any;
+          if (orient && typeof orient.unlock === "function") {
+            orient.unlock();
+          }
         }
       } catch {}
     };
@@ -283,41 +292,33 @@ export default function VideoPlayer({
     }
   };
 
-  // Build stream URL according to selected server
+  // Build stream URL according to selected server (100% Zero-Ads)
   const getStreamUrl = () => {
     if (activeServer === "vidlink") {
-      // Server 1 (DEFAULT): VidLink HD with customized Netflix red skin & Arabic/French subtitles
+      // Server 1 (DEFAULT): VidLink HD with customized Netflix red skin & Arabic/French subtitles (100% Ad-Free)
       return isSeries
         ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
         : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
     }
     if (activeServer === "torrentio") {
-      // Server 2: Torrentio 4K Auto-Best Stream Engine (VidSrc CC / Multi-Torrents CDN)
+      // Server 2: Torrentio 4K Auto-Best Stream Engine (Clean Torrent CDN)
       return isSeries
         ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
         : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
     }
-    if (activeServer === "vidsrc") {
-      // Server 3: VidSrc.me high-speed mirror
+    if (activeServer === "embedsu") {
+      // Server 3: Embed.su Multi-Language Player
       return isSeries
-        ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
+        ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+        : `https://embed.su/embed/movie/${imdbId}`;
     }
-    if (activeServer === "embed2") {
-      // Server 4: 2Embed fast alternative
-      return isSeries
-        ? `https://2embed.cc/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://2embed.cc/embed/${imdbId}`;
-    }
-    // Server 5: Embed.su Multi-Language Player
-    return isSeries
-      ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
-      : `https://embed.su/embed/movie/${imdbId}`;
+    // Server 4: FilmFlex Direct VIP Proxy
+    return `/api/video-stream?id=${imdbId}${isSeries ? `&season=${currentSeason}&episode=${currentEpisode}` : ""}`;
   };
 
   // 1-Click Auto-Best Switcher (Anti-Coupure)
   const handleAutoBestSwitch = () => {
-    const serverOrder: ServerType[] = ["vidlink", "torrentio", "vidsrc", "embed2", "embedsu"];
+    const serverOrder: ServerType[] = ["vidlink", "torrentio", "embedsu", "direct"];
     const currentIndex = serverOrder.indexOf(activeServer);
     const nextIndex = (currentIndex + 1) % serverOrder.length;
     const nextServer = serverOrder[nextIndex];

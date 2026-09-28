@@ -16,7 +16,8 @@ import CategoryGridView from "@/components/CategoryGridView";
 import NetflixPreviewsRow from "@/components/NetflixPreviewsRow";
 import MobileMovieDetailsSheet from "@/components/MobileMovieDetailsSheet";
 import DownloadsView from "@/components/DownloadsView";
-import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass, User, Download, Search } from "lucide-react";
+import MyListView from "@/components/MyListView";
+import { Home, Film, Tv, Flame, Bookmark, BookmarkCheck, Sparkles, Compass, User, Download, Search } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
 import {
   INITIAL_MOVIES,
@@ -574,6 +575,18 @@ export default function HomePage() {
             />
           )}
 
+          {/* DEDICATED MY LIST TAB (Exact match to media_1790623063448.png) */}
+          {activeTab === "mylist" && (
+            <MyListView
+              movies={myListMovies.length > 0 ? myListMovies : liveMovies.slice(0, 8)}
+              progressList={progressList}
+              onPlay={(m) => handlePlayMovie(m)}
+              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              onRemoveFromList={handleToggleMyList}
+              onBack={() => setActiveTab("home")}
+            />
+          )}
+
           {/* DEDICATED SERIES TAB */}
           {activeTab === "series" && (
             <>
@@ -608,8 +621,8 @@ export default function HomePage() {
             </>
           )}
 
-          {/* HOME / MOVIES / POPULAR / MYLIST TAB */}
-          {["home", "movies", "popular", "mylist"].includes(activeTab) && (
+          {/* HOME / MOVIES / POPULAR TAB */}
+          {["home", "movies", "popular"].includes(activeTab) && (
             <>
               {/* Row 1: Trending Now with Image 2 Filter Pills */}
               {(activeTab === "home" || activeTab === "popular") && (
@@ -860,8 +873,8 @@ export default function HomePage() {
         {[
           { id: "home", label: "Accueil", icon: Home },
           { id: "search", label: "Recherche", icon: Search },
+          { id: "mylist", label: "Ma Liste", icon: BookmarkCheck, badgeCount: myListIds.length > 0 ? myListIds.length : undefined },
           { id: "downloads", label: "Téléchargements", icon: Download, hasBadge: true },
-          { id: "anime", label: "Animés 🎌", icon: Sparkles },
           { id: "tunisien", label: "Tunisien 🇹🇳", icon: Compass },
         ].map((tab) => {
           const Icon = tab.icon;
@@ -887,11 +900,15 @@ export default function HomePage() {
                 {isActive && (
                   <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E50914] shadow-[0_0_8px_#E50914]" />
                 )}
-                {tab.hasBadge && (
+                {tab.badgeCount !== undefined && tab.badgeCount > 0 ? (
+                  <span className="absolute -top-1 -right-2 px-1 rounded-full bg-[#E50914] text-[9px] font-black text-white leading-tight">
+                    {tab.badgeCount}
+                  </span>
+                ) : tab.hasBadge ? (
                   <span className="absolute -top-1 -right-2 px-1 rounded-full bg-[#E50914] text-[9px] font-black text-white leading-tight">
                     3
                   </span>
-                )}
+                ) : null}
               </div>
               <span className={`text-[9px] sm:text-[10px] mt-1 font-medium truncate max-w-[54px] ${isActive ? "text-[#E50914] font-bold" : ""}`}>
                 {tab.label}

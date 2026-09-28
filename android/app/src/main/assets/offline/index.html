@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>FilmFlex Offline Mode</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #0e0e12; color: #ffffff; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+    .logo { color: #E50914; font-size: 32px; font-weight: 900; letter-spacing: 2px; margin-bottom: 20px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; background: rgba(229, 9, 20, 0.15); border: 1px solid rgba(229, 9, 20, 0.4); border-radius: 9999px; color: #ff4d58; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 20px; }
+    h1 { font-size: 24px; font-weight: 800; margin-bottom: 12px; }
+    p { color: #a3a3a3; font-size: 14px; line-height: 1.6; max-width: 400px; margin-bottom: 24px; }
+    .btn { display: inline-block; background-color: #E50914; color: #ffffff; font-weight: 800; padding: 14px 28px; border-radius: 9999px; text-decoration: none; font-size: 14px; transition: transform 0.2s, background-color 0.2s; cursor: pointer; border: none; }
+    .btn:active { transform: scale(0.96); }
+    .status-box { margin-top: 30px; padding: 16px; background: #141418; border: 1px solid #262626; border-radius: 16px; max-width: 380px; width: 100%; text-align: left; }
+    .status-item { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 8px; }
+    .status-item:last-child { margin-bottom: 0; }
+    .status-title { color: #737373; }
+    .status-val { color: #10b981; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="logo">FILMFLEX</div>
+  <div class="badge">Mode Hors-Ligne & Standalone</div>
+  <h1>Lecteur Natif Prêt</h1>
+  <p>Les décodeurs vidéo C++, les polices et le moteur Google Widevine DRM sont chargés dans l'application.</p>
+  <button class="btn" onclick="window.location.reload()">Réessayer la connexion</button>
+
+  <div class="status-box">
+    <div class="status-item">
+      <span class="status-title">Moteur Vidéo :</span>
+      <span class="status-val">ExoPlayer Media3 (1.2.1)</span>
+    </div>
+    <div class="status-item">
+      <span class="status-title">Décodeurs C++ :</span>
+      <span class="status-val">FFmpeg & IJKPlayer Native</span>
+    </div>
+    <div class="status-item">
+      <span class="status-title">Sécurité DRM :</span>
+      <span class="status-val">Google Widevine Modular L1/L3</span>
+    </div>
+    <div class="status-item">
+      <span class="status-title">Polices Packagées :</span>
+      <span class="status-val">11 Polices TTF / WOFF2</span>
+    </div>
+  </div>
+</body>
+</html>

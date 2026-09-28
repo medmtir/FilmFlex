@@ -14,9 +14,11 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -25,6 +27,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
+import java.io.ByteArrayInputStream;
 
 public class MainActivity extends Activity {
     private static final String APP_URL = "https://filmflex-seven.vercel.app";
@@ -107,6 +110,23 @@ public class MainActivity extends Activity {
         mWebView.setOverScrollMode(View.OVER_SCROLL_NEVER);
         mWebView.setOnLongClickListener(v -> true);
 
+        // Native JavaScript Bridge for automatic landscape rotation when playing video
+        mWebView.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void enterVideoMode() {
+                runOnUiThread(() -> {
+                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                });
+            }
+
+            @JavascriptInterface
+            public void exitVideoMode() {
+                runOnUiThread(() -> {
+                    setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+                });
+            }
+        }, "FilmFlexNative");
+
         mWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -124,18 +144,52 @@ public class MainActivity extends Activity {
             private boolean handleUrlNavigation(WebView view, String url) {
                 if (url == null) return true;
 
-                // Always allow FilmFlex domain, Supabase auth, and authorized streaming engines
+                // Block any scheme other than http/https (e.g. intent://, market://, tg://, etc.)
+                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                    return true;
+                }
+
+                // Strict Ad & Betting domain blocklist
+                String lower = url.toLowerCase();
+                if (lower.contains("popads") || lower.contains("adsterra") || lower.contains("betting") ||
+                    lower.contains("1xbet") || lower.contains("trafficjunky") || lower.contains("propeller") ||
+                    lower.contains("adtrue") || lower.contains("clickadu") || lower.contains("hilltopads") ||
+                    lower.contains("monetag") || lower.contains("onclick") || lower.contains("syndication") ||
+                    lower.contains("exoclick") || lower.contains("juicyads") || lower.contains("bet365") ||
+                    lower.contains("melbet") || lower.contains("mostbet") || lower.contains("linebet") ||
+                    lower.contains("creativecdn") || lower.contains("adnxs")) {
+                    return true; // Block ad redirect completely
+                }
+
+                // Always allow FilmFlex domain, Supabase auth, and authorized ad-free streaming engines
                 if (url.startsWith("https://filmflex-seven.vercel.app") ||
                     url.startsWith("http://localhost") ||
                     url.contains("supabase.co") ||
                     url.contains("vidlink.pro") ||
-                    url.contains("vidsrc") ||
-                    url.contains("embed")) {
+                    url.contains("vidsrc.cc") ||
+                    url.contains("embed.su") ||
+                    url.contains("youtube.com")) {
                     return false; // Load normally inside webview
                 }
 
-                // Block any external advertising, betting, or redirect URLs
+                // Block all other third party popups and redirects
                 return true;
+            }
+
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                if (request != null && request.getUrl() != null) {
+                    String url = request.getUrl().toString().toLowerCase();
+                    if (url.contains("popads") || url.contains("adsterra") || url.contains("1xbet") ||
+                        url.contains("betting") || url.contains("propellerads") || url.contains("trafficjunky") ||
+                        url.contains("clickadu") || url.contains("exoclick") || url.contains("syndication") ||
+                        url.contains("doubleclick.net") || url.contains("googleadservices") || url.contains("adtrue") ||
+                        url.contains("creativecdn") || url.contains("adnxs") || url.contains("monetag")) {
+                        // Return empty response to drop ad scripts instantly
+                        return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes()));
+                    }
+                }
+                return super.shouldInterceptRequest(view, request);
             }
 
             @Override
