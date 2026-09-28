@@ -34,7 +34,7 @@ export default function MovieCard({
   const handleMouseEnter = () => {
     setIsHovered(true);
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    // 700ms deliberate hover delay to prevent spamming YouTube embed requests
+    // 700ms deliberate hover delay to prevent spamming embed requests
     hoverTimerRef.current = setTimeout(() => {
       setShowTrailer(true);
     }, 700);
@@ -61,6 +61,19 @@ export default function MovieCard({
     : isLast
     ? "right-0 left-auto translate-x-0 origin-right"
     : "left-1/2 -translate-x-1/2 origin-center";
+
+  // Top 10 has tall portrait thumbnails (aspect 2/3), so position near top
+  // Regular rows have landscape thumbnails (aspect 16/9), so center vertically (top-1/2 -translate-y-1/2)
+  // This completely eliminates any vertical overflow or row scrolling!
+  const hoverPositionClass = top10Rank
+    ? `-top-6 md:-top-10 ${horizontalAlign} w-72 md:w-80`
+    : `top-1/2 -translate-y-1/2 ${
+        isFirst
+          ? "left-0 translate-x-0 origin-left"
+          : isLast
+          ? "right-0 left-auto translate-x-0 origin-right"
+          : "left-1/2 -translate-x-1/2 origin-center"
+      } w-60 md:w-72`;
 
   // Build clean YouTube embed URL with strict origin policy
   const youtubeEmbedUrl = movie.trailerYoutubeId
@@ -127,10 +140,10 @@ export default function MovieCard({
         </div>
       </div>
 
-      {/* Floating Netflix-Style Hover Card (Cleanly positioned, fully visible, no clipping) */}
+      {/* Floating Netflix-Style Hover Card (Cleanly positioned, fully visible, zero row scrolling) */}
       {isHovered && (
         <div
-          className={`hidden md:block absolute -top-8 md:-top-12 ${horizontalAlign} z-50 w-72 md:w-80 bg-[#181818] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] overflow-hidden border border-neutral-700/80 animate-scale-up`}
+          className={`hidden md:block absolute ${hoverPositionClass} z-50 bg-[#181818] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.95)] overflow-hidden border border-neutral-700/80 animate-scale-up`}
         >
           {/* Top Video Preview / Backdrop */}
           <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
@@ -158,26 +171,26 @@ export default function MovieCard({
             <div className="absolute inset-0 bg-gradient-to-t from-[#181818] via-transparent to-transparent pointer-events-none z-20" />
 
             <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between pointer-events-none z-20">
-              <span className="text-sm font-bold text-white drop-shadow truncate">
+              <span className="text-xs md:text-sm font-bold text-white drop-shadow truncate">
                 {movie.title}
               </span>
             </div>
           </div>
 
           {/* Card Body */}
-          <div className="p-3.5 space-y-3">
+          <div className="p-3 space-y-2.5">
             {/* Action Buttons Row */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onPlay(movie);
                   }}
-                  className="w-9 h-9 rounded-full bg-white hover:bg-neutral-200 text-black flex items-center justify-center transition-all shadow-md hover:scale-105"
+                  className="w-8 h-8 rounded-full bg-white hover:bg-neutral-200 text-black flex items-center justify-center transition-all shadow-md hover:scale-105"
                   title="Lecture"
                 >
-                  <Play className="w-4 h-4 fill-black ml-0.5" />
+                  <Play className="w-3.5 h-3.5 fill-black ml-0.5" />
                 </button>
 
                 <button
@@ -185,18 +198,18 @@ export default function MovieCard({
                     e.stopPropagation();
                     onToggleMyList(movie);
                   }}
-                  className="w-9 h-9 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
+                  className="w-8 h-8 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
                   title={isInMyList ? "Retirer de Ma Liste" : "Ajouter à Ma Liste"}
                 >
-                  {isInMyList ? <Check className="w-4 h-4 text-emerald-400" /> : <Plus className="w-4 h-4" />}
+                  {isInMyList ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Plus className="w-3.5 h-3.5" />}
                 </button>
 
                 <button
                   onClick={(e) => e.stopPropagation()}
-                  className="w-9 h-9 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
+                  className="w-8 h-8 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
                   title="J'aime"
                 >
-                  <ThumbsUp className="w-4 h-4" />
+                  <ThumbsUp className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -205,17 +218,17 @@ export default function MovieCard({
                   e.stopPropagation();
                   onOpenModal(movie);
                 }}
-                className="w-9 h-9 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
+                className="w-8 h-8 rounded-full border border-neutral-500 hover:border-white bg-[#2a2a2a]/80 text-white flex items-center justify-center transition-all hover:scale-105"
                 title="Plus d'infos"
               >
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Resume Time Info if applicable */}
             {progress && progress.currentSeconds > 0 && (
               <div className="space-y-1">
-                <div className="flex justify-between text-[11px] text-neutral-400">
+                <div className="flex justify-between text-[10px] text-neutral-400">
                   <span>Reprendre la lecture</span>
                   <span>
                     {Math.floor(progress.currentSeconds / 60)} min / {Math.floor(progress.totalSeconds / 60)} min
@@ -231,23 +244,23 @@ export default function MovieCard({
             )}
 
             {/* Badges */}
-            <div className="flex items-center gap-2 text-xs font-semibold">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold">
               <span className="text-emerald-400 font-bold">{movie.matchPercentage}% Match</span>
-              <span className="px-1.5 py-0.5 border border-neutral-600 rounded text-[10px] text-neutral-300">
+              <span className="px-1 py-0.2 border border-neutral-600 rounded text-[9px] text-neutral-300">
                 {movie.ageRating}
               </span>
-              <span className="text-neutral-400 text-[11px]">{movie.duration}</span>
-              <span className="text-[10px] px-1.5 py-0.5 bg-neutral-800 text-neutral-300 rounded font-mono font-semibold">
+              <span className="text-neutral-400 text-[10px]">{movie.duration}</span>
+              <span className="text-[9px] px-1 py-0.2 bg-neutral-800 text-neutral-300 rounded font-mono font-semibold">
                 {movie.quality}
               </span>
             </div>
 
             {/* Genre tags */}
-            <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-neutral-300">
-              {movie.genres.map((g, idx) => (
-                <span key={g} className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1 text-[10px] text-neutral-400">
+              {movie.genres.slice(0, 3).map((g, idx, arr) => (
+                <span key={g} className="flex items-center gap-1">
                   <span>{g}</span>
-                  {idx < movie.genres.length - 1 && <span className="text-neutral-600">•</span>}
+                  {idx < arr.length - 1 && <span className="text-neutral-600">•</span>}
                 </span>
               ))}
             </div>

@@ -70,8 +70,8 @@ export default function MovieRow({
         <div
           ref={rowRef}
           onScroll={checkScroll}
-          className="flex items-center gap-2 md:gap-3 overflow-x-auto no-scrollbar py-12 md:py-16 -my-8 md:-my-10 px-1"
-          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          className="flex items-center gap-2 md:gap-3 overflow-x-auto overflow-y-hidden no-scrollbar py-12 md:py-16 -my-8 md:-my-10 px-1"
+          style={{ overflowY: "hidden", scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {movies.map((movie, index) => {
             const progress = progressList.find((p) => p.movieId === movie.id);
