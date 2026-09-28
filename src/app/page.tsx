@@ -101,6 +101,82 @@ export default function HomePage() {
     }
   }, []);
 
+  // Hardware Back-Button Handler (Step-by-step navigation for Android Phone & Mobile Web)
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).FilmFlexHandleBack = () => {
+      // 1. If Video Player is active -> close it
+      if (playingMovie) {
+        setPlayingMovie(null);
+        return true;
+      }
+      // 2. If Movie Details Modal / Sheet is open -> close it
+      if (selectedMovieForModal) {
+        setSelectedMovieForModal(null);
+        return true;
+      }
+      // 3. If any modal is open -> close it
+      if (showAuthModal) {
+        setShowAuthModal(false);
+        return true;
+      }
+      if (showPaywall) {
+        setShowPaywall(false);
+        return true;
+      }
+      if (showAdminDashboard) {
+        setShowAdminDashboard(false);
+        return true;
+      }
+      if (showScreenLimitModal) {
+        setShowScreenLimitModal(false);
+        return true;
+      }
+      if (showProfileGate) {
+        setShowProfileGate(false);
+        return true;
+      }
+      // 4. If search query is entered -> clear it
+      if (searchQuery.trim().length > 0) {
+        setSearchQuery("");
+        return true;
+      }
+      // 5. If on another tab than "home" -> navigate back to home
+      if (activeTab !== "home") {
+        setActiveTab("home");
+        return true;
+      }
+      // 6. At root home -> return false so Android app asks to exit
+      return false;
+    };
+
+    // Also support browser back button via popstate
+    const handlePopState = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const handler = (window as any).FilmFlexHandleBack;
+      if (typeof handler === "function") {
+        handler();
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window as any).FilmFlexHandleBack;
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [
+    playingMovie,
+    selectedMovieForModal,
+    showAuthModal,
+    showPaywall,
+    showAdminDashboard,
+    showScreenLimitModal,
+    showProfileGate,
+    searchQuery,
+    activeTab,
+  ]);
+
   // Update profile data when active profile changes
   useEffect(() => {
     if (activeProfile) {

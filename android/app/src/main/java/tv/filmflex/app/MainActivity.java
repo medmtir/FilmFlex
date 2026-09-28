@@ -161,12 +161,17 @@ public class MainActivity extends Activity {
                     return true; // Block ad redirect completely
                 }
 
-                // Always allow FilmFlex domain, Supabase auth, and authorized ad-free streaming engines
+                // Always allow FilmFlex domain, Supabase auth, and authorized streaming engines (Mondial & Torrentio)
                 if (url.startsWith("https://filmflex-seven.vercel.app") ||
                     url.startsWith("http://localhost") ||
                     url.contains("supabase.co") ||
-                    url.contains("vidlink.pro") ||
+                    url.contains("vidsrc.me") ||
+                    url.contains("vidsrc.xyz") ||
+                    url.contains("vidsrc.to") ||
+                    url.contains("vidsrc.in") ||
+                    url.contains("vidsrc.net") ||
                     url.contains("vidsrc.cc") ||
+                    url.contains("vidlink.pro") ||
                     url.contains("embed.su") ||
                     url.contains("youtube.com")) {
                     return false; // Load normally inside webview
@@ -275,18 +280,40 @@ public class MainActivity extends Activity {
             onCustomViewHidden();
             return;
         }
-        if (mWebView.canGoBack()) {
-            mWebView.goBack();
-        } else {
-            if (backPressedTime + 2000 > System.currentTimeMillis()) {
-                if (backToast != null) backToast.cancel();
-                super.onBackPressed();
-            } else {
-                backToast = Toast.makeText(this, "Appuyez à nouveau pour quitter FilmFlex", Toast.LENGTH_SHORT);
-                backToast.show();
-                backPressedTime = System.currentTimeMillis();
+
+        // Ask the React SPA if it handled the back step (closing player, modal, or returning to home)
+        mWebView.evaluateJavascript(
+            "(function() { " +
+            "  if (typeof window.FilmFlexHandleBack === 'function') { " +
+            "    return window.FilmFlexHandleBack(); " +
+            "  } " +
+            "  return false; " +
+            "})()",
+            value -> {
+                runOnUiThread(() -> {
+                    boolean handledByWeb = "true".equalsIgnoreCase(value);
+                    if (handledByWeb) {
+                        // Handled by web app (video closed, modal closed, tab changed back, etc.)
+                        return;
+                    }
+
+                    // Not handled by web app: check standard WebView history
+                    if (mWebView.canGoBack()) {
+                        mWebView.goBack();
+                    } else {
+                        // At root home: double press to exit
+                        if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                            if (backToast != null) backToast.cancel();
+                            finish();
+                        } else {
+                            backToast = Toast.makeText(this, "Appuyez à nouveau pour quitter FilmFlex", Toast.LENGTH_SHORT);
+                            backToast.show();
+                            backPressedTime = System.currentTimeMillis();
+                        }
+                    }
+                });
             }
-        }
+        );
     }
 
     private void onCustomViewHidden() {

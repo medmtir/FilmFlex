@@ -29,7 +29,7 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "vidlink" | "torrentio" | "embedsu" | "direct";
+type ServerType = "mondial" | "torrentio";
 
 interface ServerOption {
   id: ServerType;
@@ -40,28 +40,16 @@ interface ServerOption {
 
 const SERVER_OPTIONS: ServerOption[] = [
   {
-    id: "vidlink",
-    name: "Serveur 1 (Netflix Ultra HD)",
-    badge: "⭐ Défaut (Netflix)",
-    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR • 100% Zéro pub ni redirection",
+    id: "mondial",
+    name: "Serveur 1 (FilmFlex Mondial)",
+    badge: "⭐ Mondial Pro",
+    description: "Serveur mondial complet • Compatible avec 100% des films et séries",
   },
   {
     id: "torrentio",
     name: "Serveur 2 (Torrentio CDN 4K)",
     badge: "Torrentio 4K",
-    description: "Moteur Torrentio & Debrid multi-flux 4K/1080p sans coupure • 100% Zéro pub",
-  },
-  {
-    id: "embedsu",
-    name: "Serveur 3 (FilmFlex Multi-Langues)",
-    badge: "Multi-Langues",
-    description: "Sous-titres multi-langues et streaming instantané sans pub",
-  },
-  {
-    id: "direct",
-    name: "Serveur 4 (FilmFlex VIP Direct)",
-    badge: "Direct VIP",
-    description: "Flux vidéo direct HTML5 haute vitesse sans aucun intermédiaire",
+    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p",
   },
 ];
 
@@ -102,8 +90,8 @@ export default function VideoPlayer({
   const [episodesList, setEpisodesList] = useState<Episode[]>([]);
   const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
 
-  // Player state: VidLink (Netflix Ultra HD) is the #1 DEFAULT server with 0 sandbox errors & clean controls
-  const [activeServer, setActiveServer] = useState<ServerType>("vidlink");
+  // Player state: Mondial is default for universal compatibility across all movies
+  const [activeServer, setActiveServer] = useState<ServerType>("mondial");
   const [showServerMenu, setShowServerMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -159,8 +147,15 @@ export default function VideoPlayer({
     };
   }, []);
 
-  // Mobile orientation handling
+  // Mobile orientation and auto-fullscreen handling (Ken fel tlf temchi, fel web ma temchich)
   useEffect(() => {
+    const isMobilePhone =
+      typeof window !== "undefined" &&
+      (window.innerWidth < 768 ||
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Boolean((window as any).FilmFlexNative));
+
     const handleOrientation = () => {
       if (typeof window !== "undefined" && window.innerWidth > window.innerHeight) {
         setIsLandscapeMode(true);
@@ -169,44 +164,52 @@ export default function VideoPlayer({
       }
     };
 
-    try {
-      if (typeof window !== "undefined") {
+    if (isMobilePhone) {
+      try {
+        // 1. Android APK native bridge: rotate device to landscape
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const nativeApp = (window as any).FilmFlexNative;
         if (nativeApp && typeof nativeApp.enterVideoMode === "function") {
           nativeApp.enterVideoMode();
         }
 
-        if (window.innerWidth < 768) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const orient = screen.orientation as any;
-          if (orient && typeof orient.lock === "function") {
-            orient.lock("landscape").catch(() => {});
-          }
+        // 2. Mobile Browser orientation lock
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
+        if (orient && typeof orient.lock === "function") {
+          orient.lock("landscape").catch(() => {});
         }
-      }
-    } catch {}
 
-    window.addEventListener("resize", handleOrientation);
-    window.addEventListener("orientationchange", handleOrientation);
+        // 3. Mobile auto-fullscreen
+        if (containerRef.current && !document.fullscreenElement) {
+          containerRef.current.requestFullscreen().catch(() => {});
+        }
+      } catch {}
+
+      window.addEventListener("resize", handleOrientation);
+      window.addEventListener("orientationchange", handleOrientation);
+    }
 
     return () => {
-      window.removeEventListener("resize", handleOrientation);
-      window.removeEventListener("orientationchange", handleOrientation);
-      try {
-        if (typeof window !== "undefined") {
+      if (isMobilePhone) {
+        window.removeEventListener("resize", handleOrientation);
+        window.removeEventListener("orientationchange", handleOrientation);
+        try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const nativeApp = (window as any).FilmFlexNative;
           if (nativeApp && typeof nativeApp.exitVideoMode === "function") {
             nativeApp.exitVideoMode();
           }
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const orient = screen.orientation as any;
+          const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
           if (orient && typeof orient.unlock === "function") {
             orient.unlock();
           }
-        }
-      } catch {}
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        } catch {}
+      }
     };
   }, []);
 
@@ -309,39 +312,26 @@ export default function VideoPlayer({
     }
   };
 
-  // Build stream URL according to selected server (100% Zero-Ads)
+  // Build stream URL according to selected server (Mondial & Torrentio only)
   const getStreamUrl = () => {
-    if (activeServer === "vidlink") {
-      // Server 1 (DEFAULT): VidLink HD with customized Netflix red skin & Arabic/French subtitles (100% Ad-Free)
+    if (activeServer === "mondial") {
+      // Server 1 (DEFAULT): FilmFlex Mondial - Universal compatibility across all movies & series
       return isSeries
-        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
-        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
+        ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
     }
-    if (activeServer === "torrentio") {
-      // Server 2: VidLink Ultra Multi-Source Engine (Torrentio & Debrid CDN) - 100% Ad-Free
-      return isSeries
-        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?player=jw&primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
-        : `https://vidlink.pro/movie/${imdbId}?player=jw&primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
-    }
-    if (activeServer === "embedsu") {
-      // Server 3: Embed.su Multi-Language Player
-      return isSeries
-        ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
-        : `https://embed.su/embed/movie/${imdbId}`;
-    }
-    // Server 4: FilmFlex Direct VIP Proxy
-    return `/api/video-stream?id=${imdbId}${isSeries ? `&season=${currentSeason}&episode=${currentEpisode}` : ""}`;
+    // Server 2: Torrentio CDN 4K
+    return isSeries
+      ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
+      : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
   };
 
-  // 1-Click Auto-Best Switcher (Anti-Coupure)
+  // 1-Click Auto-Best Switcher (Anti-Coupure) toggling between Mondial & Torrentio
   const handleAutoBestSwitch = () => {
-    const serverOrder: ServerType[] = ["vidlink", "torrentio", "embedsu", "direct"];
-    const currentIndex = serverOrder.indexOf(activeServer);
-    const nextIndex = (currentIndex + 1) % serverOrder.length;
-    const nextServer = serverOrder[nextIndex];
+    const nextServer: ServerType = activeServer === "mondial" ? "torrentio" : "mondial";
     setActiveServer(nextServer);
     const nextInfo = SERVER_OPTIONS.find((s) => s.id === nextServer);
-    setResumedNotice(`⚡ Basculé sur : ${nextInfo?.name || "Meilleur flux"}`);
+    setResumedNotice(`⚡ Basculé sur : ${nextInfo?.name || "Serveur alternatif"}`);
     setTimeout(() => setResumedNotice(null), 3500);
   };
 
@@ -506,7 +496,7 @@ export default function VideoPlayer({
                   <div className="absolute top-11 right-0 w-72 bg-[#141414]/95 backdrop-blur-xl border border-neutral-800 rounded-2xl p-2.5 shadow-2xl z-50 animate-scale-up space-y-1">
                     <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800 flex items-center justify-between">
                       <span>Serveurs de Streaming</span>
-                      <span className="text-[10px] text-emerald-400">Netflix Ultra HD Par Défaut</span>
+                      <span className="text-[10px] text-emerald-400">Mondial Par Défaut</span>
                     </div>
                     {SERVER_OPTIONS.map((srv) => (
                       <button

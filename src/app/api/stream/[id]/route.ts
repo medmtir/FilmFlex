@@ -163,11 +163,11 @@ export async function GET(
       browserStreamUrl = localMovie?.videoUrl || fallbackStreams["1080p"];
     }
 
-    // Direct Web Stream fallback URL (instant playback, zero peer waiting, 100% ad-free)
+    // Direct Web Stream fallback URL (Serveur Mondial)
     const isSeries = season !== undefined && episode !== undefined;
     const webStreamUrl = isSeries
-      ? `https://vidlink.pro/tv/${imdbId}/${season}/${episode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
-      : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
+      ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${season}&episode=${episode}`
+      : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
 
     return NextResponse.json(
       {
