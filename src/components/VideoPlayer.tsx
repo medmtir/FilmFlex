@@ -24,6 +24,8 @@ import {
   X,
   Settings2,
   Zap,
+  RotateCw,
+  Scaling,
 } from "lucide-react";
 import { Movie, Profile, Episode } from "@/types";
 import { saveMovieProgress, getMovieResumeTime } from "@/lib/storage";
@@ -78,10 +80,8 @@ export default function VideoPlayer({
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [castNotice, setCastNotice] = useState<string | null>(null);
 
-  // Stream & Quality state (defaults to guaranteed working browser-compatible MP4)
-  const [streamUrl, setStreamUrl] = useState<string>(
-    movie.videoUrl || "/sample.mp4"
-  );
+  // Stream & Quality state
+  const [streamUrl, setStreamUrl] = useState<string>("");
   const fallbackAttemptsRef = useRef<number>(0);
   const [stremioAppUrl, setStremioAppUrl] = useState<string>("");
   const [qualityMap, setQualityMap] = useState<Record<string, string>>({});
@@ -93,6 +93,10 @@ export default function VideoPlayer({
     { key: "480p", label: "480p SD (Connexion faible)" },
     { key: "4k", label: "4K Ultra HD" },
   ]);
+
+  // Mobile orientation & aspect-ratio states
+  const [isLandscapeMode, setIsLandscapeMode] = useState<boolean>(false);
+  const [aspectMode, setAspectMode] = useState<"contain" | "cover">("contain");
 
   // Menus
   const [activeMenu, setActiveMenu] = useState<"quality" | "speed" | "subtitles" | "audio" | null>(null);
@@ -107,43 +111,88 @@ export default function VideoPlayer({
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
 
-  // Fast switch handler: immediate fallback to guaranteed smooth stream
+  // Auto-request landscape on mobile mount
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orient = screen.orientation as any;
+        if (orient && typeof orient.lock === "function") {
+          orient.lock("landscape").then(() => setIsLandscapeMode(true)).catch(() => {});
+        }
+      }
+    } catch {}
+
+    return () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const orient = screen.orientation as any;
+        if (orient && typeof orient.unlock === "function") {
+          orient.unlock();
+        }
+      } catch {}
+    };
+  }, []);
+
+  // Mobile toggle rotate (Screen Orientation API + CSS transform fallback)
+  const toggleRotate = () => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
+      if (orient && typeof orient.lock === "function") {
+        if (!isLandscapeMode) {
+          orient.lock("landscape").then(() => {
+            setIsLandscapeMode(true);
+          }).catch(() => {
+            setIsLandscapeMode((prev) => !prev);
+          });
+          return;
+        } else {
+          if (typeof orient.unlock === "function") orient.unlock();
+          setIsLandscapeMode(false);
+          return;
+        }
+      }
+    } catch {}
+    setIsLandscapeMode((prev) => !prev);
+  };
+
+  // Reload or switch to alternative quality stream
   const handleFastSwitch = () => {
-    setIsLoading(false);
     setShowFastSwitch(false);
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-    const fastUrl = movie.videoUrl || "/sample.mp4";
-    setStreamUrl(fastUrl);
-    if (videoRef.current) {
-      videoRef.current.src = fastUrl;
+    const nextStream = qualityMap["720p"] || qualityMap["1080p"] || Object.values(qualityMap)[0];
+    if (nextStream && nextStream !== streamUrl) {
+      setIsLoading(true);
+      setStreamUrl(nextStream);
+      if (videoRef.current) {
+        videoRef.current.src = nextStream;
+        videoRef.current.load();
+        videoRef.current.play().catch(() => {});
+      }
+    } else if (videoRef.current) {
+      setIsLoading(true);
+      videoRef.current.load();
       videoRef.current.play().catch(() => {});
     }
   };
 
-  // Watchdog timer: if buffering exceeds 4.5s, display instant switch; if 9.5s, auto-switch
+  // Watchdog timer: show reload option if buffering takes > 5s
   useEffect(() => {
     let warnTimer: NodeJS.Timeout;
-    let autoFallbackTimer: NodeJS.Timeout;
-
     if (isLoading && !isPlayingIntro) {
       warnTimer = setTimeout(() => {
         setShowFastSwitch(true);
-      }, 4500);
-
-      autoFallbackTimer = setTimeout(() => {
-        console.warn("Buffering timeout (9.5s) reached, activating fast stream fallback");
-        handleFastSwitch();
-      }, 9500);
+      }, 5000);
     } else {
       setShowFastSwitch(false);
     }
 
     return () => {
       clearTimeout(warnTimer);
-      clearTimeout(autoFallbackTimer);
     };
   }, [isLoading, isPlayingIntro]);
 
@@ -558,7 +607,11 @@ export default function VideoPlayer({
     <div
       ref={containerRef}
       onMouseMove={handleMouseMove}
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden text-white font-sans"
+      className={`fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden text-white font-sans transition-all duration-300 ${
+        isLandscapeMode
+          ? "rotate-90 origin-top-left !w-[100dvh] !h-[100dvw] translate-x-[100dvw]"
+          : "w-full h-full"
+      }`}
     >
       {/* ============================================================ */}
       {/* 1. ACTUAL FILMLEX.MP4 INTRO - 100% FULLSCREEN COVER           */}
@@ -598,6 +651,7 @@ export default function VideoPlayer({
               setIsPlaying(true);
             }}
             onCanPlay={() => setIsLoading(false)}
+            onLoadedData={() => setIsLoading(false)}
             onError={() => {
               console.warn("Video playback error handled gracefully");
               setIsLoading(false);
@@ -620,15 +674,17 @@ export default function VideoPlayer({
                 onBack();
               }
             }}
-            className="w-full h-full object-contain cursor-pointer"
+            className={`w-full h-full cursor-pointer transition-all duration-300 ${
+              aspectMode === "cover" ? "object-cover" : "object-contain"
+            }`}
             preload="auto"
             playsInline
           />
 
-          {/* FilmFlex Loading Spinner & Buffering Watchdog */}
+          {/* FilmFlex Loading Spinner */}
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-              <div className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 max-w-sm mx-4 text-center">
+              <div className="relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl bg-black/70 backdrop-blur-md border border-white/10 max-w-sm mx-4 text-center">
                 <div className="relative flex items-center justify-center">
                   <Loader2 className="w-14 h-14 text-[#E50914] animate-spin opacity-90" />
                   <div className="absolute text-[10px] text-white font-black tracking-widest">
@@ -640,13 +696,13 @@ export default function VideoPlayer({
                 </span>
                 {showFastSwitch && (
                   <div className="animate-fade-in flex flex-col items-center gap-2 mt-1 pointer-events-auto">
-                    <p className="text-[11px] text-neutral-400">P2P en attente de seeders</p>
+                    <p className="text-[11px] text-neutral-400">Connexion en cours...</p>
                     <button
                       onClick={handleFastSwitch}
-                      className="px-4 py-2 bg-[#E50914] hover:bg-[#b81d24] text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5 transition-all hover:scale-105"
+                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-600 text-white text-xs font-bold rounded-full shadow-lg flex items-center gap-1.5 transition-all hover:scale-105"
                     >
-                      <Zap className="w-3.5 h-3.5 fill-white" />
-                      <span>Lecture directe sans attente</span>
+                      <RotateCw className="w-3.5 h-3.5 text-[#E50914]" />
+                      <span>Recharger le flux</span>
                     </button>
                   </div>
                 )}
@@ -724,21 +780,33 @@ export default function VideoPlayer({
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
-              <h2 className="text-xs sm:text-base font-medium tracking-wide text-neutral-200 truncate max-w-[150px] sm:max-w-md">
+              <h2 className="text-xs sm:text-base font-medium tracking-wide text-neutral-200 truncate max-w-[140px] sm:max-w-md">
                 {movie.title}
                 {isSeries && ` (${currentSeason}x${currentEpisode})`}
               </h2>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
+              {/* Rotate Screen button for mobile / portrait phones */}
               <button
-                onClick={handleFastSwitch}
-                className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-[11px] font-mono font-semibold"
-                title="Passer en mode ultra-rapide"
+                onClick={toggleRotate}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-[10px] sm:text-xs font-semibold transition-all"
+                title="Tourner l'écran (Paysage / Portrait)"
               >
-                <Zap className="w-3 h-3 text-[#E50914] fill-[#E50914]" />
-                <span className="hidden sm:inline">Fast</span>
+                <RotateCw className="w-3.5 h-3.5 text-purple-400" />
+                <span>{isLandscapeMode ? "Portrait" : "Paysage"}</span>
               </button>
+
+              {/* Fit / Cover mode toggle */}
+              <button
+                onClick={() => setAspectMode(aspectMode === "contain" ? "cover" : "contain")}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 text-xs font-semibold transition-all"
+                title="Ajuster le format (Adapter / Remplir)"
+              >
+                <Scaling className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-[10px] sm:text-xs">{aspectMode === "contain" ? "Adapter" : "Remplir"}</span>
+              </button>
+
               <span className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded-full bg-neutral-900/90 text-neutral-300 border border-neutral-700 text-[10px] sm:text-xs font-mono font-semibold uppercase">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>{selectedQuality === "auto" ? "1080p HD" : selectedQuality.toUpperCase()}</span>
@@ -1012,10 +1080,19 @@ export default function VideoPlayer({
                 {/* 7. 🗗 Picture in Picture */}
                 <button
                   onClick={togglePiP}
-                  className="text-neutral-300 hover:text-white transition-colors p-1"
+                  className="text-neutral-300 hover:text-white transition-colors p-1 hidden sm:block"
                   title="Picture in Picture"
                 >
                   <PictureInPicture2 className="w-4 h-4" />
+                </button>
+
+                {/* 8. 🔄 Tourner l'écran */}
+                <button
+                  onClick={toggleRotate}
+                  className="text-neutral-300 hover:text-white transition-colors p-1"
+                  title="Tourner l'écran (Paysage / Portrait)"
+                >
+                  <RotateCw className="w-4 h-4 text-purple-400" />
                 </button>
               </div>
             </div>

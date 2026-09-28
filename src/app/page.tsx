@@ -11,7 +11,7 @@ import PaywallModal from "@/components/PaywallModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
 import { Home, Film, Tv, Flame, Bookmark } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
-import { INITIAL_MOVIES } from "@/lib/constants";
+import { INITIAL_MOVIES, INITIAL_SERIES } from "@/lib/constants";
 import {
   getStoredUser,
   saveUser,
@@ -46,7 +46,7 @@ export default function HomePage() {
   const [actionMovies, setActionMovies] = useState<Movie[]>([]);
   const [scifiMovies, setScifiMovies] = useState<Movie[]>([]);
   const [comedyMovies, setComedyMovies] = useState<Movie[]>([]);
-  const [seriesMovies, setSeriesMovies] = useState<Movie[]>([]);
+  const [seriesMovies, setSeriesMovies] = useState<Movie[]>(INITIAL_SERIES);
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -269,10 +269,10 @@ export default function HomePage() {
         }}
       />
 
-      {/* 2. Main Hero Billboard (Only on Home tab without search) */}
-      {!searchQuery && activeTab === "home" && (
+      {/* 2. Main Hero Billboard (On Home and Series tabs) */}
+      {!searchQuery && (activeTab === "home" || activeTab === "series") && (
         <Billboard
-          movie={featuredMovie}
+          movie={activeTab === "series" ? (seriesMovies[0] || INITIAL_SERIES[0]) : featuredMovie}
           onPlay={(m) => handlePlayMovie(m)}
           onMoreInfo={(movie) => setSelectedMovieForModal(movie)}
         />
@@ -321,129 +321,161 @@ export default function HomePage() {
       ) : (
         /* 
           4. Netflix Rows Catalogue:
-          FIX: Negative margin only applies on 'home' tab with billboard.
-          On 'movies', 'series', 'popular', 'mylist', we add clean top padding (pt-24 md:pt-32) so thumbnails NEVER overlap the header!
         */
         <main
           className={`relative z-20 pb-20 space-y-2 ${
-            activeTab === "home" ? "-mt-10 md:-mt-24" : "pt-24 md:pt-32"
+            activeTab === "home" || activeTab === "series" ? "-mt-10 md:-mt-24" : "pt-24 md:pt-32"
           }`}
         >
           {/* Page Title for Sub-tabs */}
-          {activeTab !== "home" && (
+          {activeTab !== "home" && activeTab !== "series" && (
             <div className="px-4 md:px-8 mb-4">
               <h1 className="text-2xl md:text-3xl font-extrabold text-white">
                 {activeTab === "movies" && "Films Populaires"}
-                {activeTab === "series" && "Séries Télévisées & Épisodes"}
                 {activeTab === "popular" && "Nouveautés & Plus Vus"}
                 {activeTab === "mylist" && "Ma Liste de Lecture"}
               </h1>
             </div>
           )}
 
-          {/* Continue Watching Row */}
-          {continueWatchingMovies.length > 0 && activeTab === "home" && (
-            <MovieRow
-              title={`Reprendre la lecture (${activeProfile.name})`}
-              movies={continueWatchingMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+          {/* SÉRIES CATALOGUE TAB */}
+          {activeTab === "series" ? (
+            <>
+              <MovieRow
+                title="Séries Populaires & Plus Vues"
+                movies={seriesMovies}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Séries Policières, Drames & Thrillers"
+                movies={seriesMovies.filter((s) => s.genres.some((g) => ["Crime", "Drama", "Thriller", "Action"].includes(g))).slice(0, 15)}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+              <MovieRow
+                title="Séries Science-Fiction, Fantastique & Aventure"
+                movies={seriesMovies.filter((s) => s.genres.some((g) => ["Sci-Fi", "Fantasy", "Horror", "Adventure"].includes(g))).slice(0, 15)}
+                progressList={progressList}
+                myListIds={myListIds}
+                onPlay={(m) => handlePlayMovie(m)}
+                onToggleMyList={handleToggleMyList}
+                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+              />
+            </>
+          ) : (
+            <>
+              {/* Continue Watching Row */}
+              {continueWatchingMovies.length > 0 && activeTab === "home" && (
+                <MovieRow
+                  title={`Reprendre la lecture (${activeProfile.name})`}
+                  movies={continueWatchingMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* My List */}
-          {myListMovies.length > 0 && (activeTab === "home" || activeTab === "mylist") && (
-            <MovieRow
-              title="Ma Liste"
-              movies={myListMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* My List */}
+              {myListMovies.length > 0 && (activeTab === "home" || activeTab === "mylist") && (
+                <MovieRow
+                  title="Ma Liste"
+                  movies={myListMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* Top 10 Movies Today in FilmFlex */}
-          {top10Movies.length > 0 && (activeTab === "home" || activeTab === "popular") && (
-            <MovieRow
-              title="Top 10 des films aujourd'hui sur FilmFlex"
-              movies={top10Movies}
-              isTop10={true}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* Top 10 Movies Today in FilmFlex */}
+              {top10Movies.length > 0 && (activeTab === "home" || activeTab === "popular") && (
+                <MovieRow
+                  title="Top 10 des films aujourd'hui sur FilmFlex"
+                  movies={top10Movies}
+                  isTop10={true}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* TV Series (Only on Home and Series tabs) */}
-          {seriesMovies.length > 0 && (activeTab === "home" || activeTab === "series") && (
-            <MovieRow
-              title="Séries Télévisées Complètes"
-              movies={seriesMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* TV Series Row on Home Tab */}
+              {seriesMovies.length > 0 && activeTab === "home" && (
+                <MovieRow
+                  title="Séries Télévisées Populaires"
+                  movies={seriesMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* Trending Now */}
-          {(activeTab === "home" || activeTab === "movies" || activeTab === "popular") && (
-            <MovieRow
-              title="Tendances actuelles"
-              movies={liveMovies.slice(10)}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* Trending Now */}
+              {(activeTab === "home" || activeTab === "movies" || activeTab === "popular") && (
+                <MovieRow
+                  title="Tendances actuelles"
+                  movies={liveMovies.slice(10)}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* Action & Adventure */}
-          {actionMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
-            <MovieRow
-              title="Action & Aventure"
-              movies={actionMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* Action & Adventure */}
+              {actionMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Action & Aventure"
+                  movies={actionMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* Sci-Fi */}
-          {scifiMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
-            <MovieRow
-              title="Science-Fiction & Fantastique"
-              movies={scifiMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
-          )}
+              {/* Sci-Fi */}
+              {scifiMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Science-Fiction & Fantastique"
+                  movies={scifiMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
 
-          {/* Comedy */}
-          {comedyMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
-            <MovieRow
-              title="Comédies & Feel-Good"
-              movies={comedyMovies}
-              progressList={progressList}
-              myListIds={myListIds}
-              onPlay={(m) => handlePlayMovie(m)}
-              onToggleMyList={handleToggleMyList}
-              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-            />
+              {/* Comedy */}
+              {comedyMovies.length > 0 && (activeTab === "home" || activeTab === "movies") && (
+                <MovieRow
+                  title="Comédies & Feel-Good"
+                  movies={comedyMovies}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+            </>
           )}
         </main>
       )}
