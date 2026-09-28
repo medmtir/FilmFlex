@@ -16,6 +16,7 @@ interface MovieRowProps {
   onPlay: (movie: Movie) => void;
   onToggleMyList: (movie: Movie) => void;
   onOpenModal: (movie: Movie) => void;
+  onViewAll?: () => void;
 }
 
 export default function MovieRow({
@@ -29,6 +30,7 @@ export default function MovieRow({
   onPlay,
   onToggleMyList,
   onOpenModal,
+  onViewAll,
 }: MovieRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -60,11 +62,27 @@ export default function MovieRow({
 
   return (
     <div className="space-y-2 select-none relative group my-6 px-4 md:px-8">
-      {/* Row Header: Title and Image 2 Category Filter Pills */}
+      {/* Row Header: Title and Category Filter Pills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-        <h2 className="text-lg md:text-xl font-extrabold text-white tracking-wide hover:text-neutral-300 transition-colors cursor-pointer inline-flex items-center gap-1.5">
-          {title}
-        </h2>
+        <div className="flex items-center gap-3">
+          <h2
+            onClick={onViewAll}
+            className={`text-lg md:text-xl font-extrabold text-white tracking-wide transition-colors inline-flex items-center gap-1.5 ${
+              onViewAll ? "cursor-pointer hover:text-[#E50914]" : ""
+            }`}
+          >
+            {title}
+          </h2>
+          {onViewAll && (
+            <button
+              onClick={onViewAll}
+              className="text-xs font-semibold text-[#E50914] hover:text-[#ff4d58] transition-colors flex items-center gap-0.5 cursor-pointer bg-[#E50914]/10 hover:bg-[#E50914]/20 px-2.5 py-0.5 rounded-full border border-[#E50914]/30"
+            >
+              <span>Tout voir</span>
+              <span className="text-sm">›</span>
+            </button>
+          )}
+        </div>
 
         {filterGenres && filterGenres.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">

@@ -95,8 +95,8 @@ export default function VideoPlayer({
     };
   }, [userId]);
 
-  // Intro video state
-  const [isPlayingIntro, setIsPlayingIntro] = useState(true);
+  // Intro video state - disabled by default for instant 1-tap playback on mobile & web
+  const [isPlayingIntro, setIsPlayingIntro] = useState(false);
 
   // Series details
   const isSeries =
@@ -183,26 +183,25 @@ export default function VideoPlayer({
   }, []);
 
   // Mobile-only rotation button toggle
-  const toggleRotate = () => {
-    if (typeof window !== "undefined" && window.innerWidth >= 768) return;
-
+  const toggleRotate = async () => {
     try {
+      if (containerRef.current && !document.fullscreenElement) {
+        await containerRef.current.requestFullscreen().catch(() => {});
+      }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orient = (screen.orientation || (screen as any).mozOrientation || (screen as any).msOrientation) as any;
       if (orient && typeof orient.lock === "function") {
         if (!isLandscapeMode) {
-          orient.lock("landscape").then(() => {}).catch(() => {
-            setIsLandscapeMode(true);
-          });
-          return;
+          await orient.lock("landscape").catch(() => {});
+          setIsLandscapeMode(true);
         } else {
           if (typeof orient.unlock === "function") orient.unlock();
           setIsLandscapeMode(false);
-          return;
         }
       }
-    } catch {}
-    setIsLandscapeMode((prev) => !prev);
+    } catch {
+      // Fallback
+    }
   };
 
   // Fetch episodes list if TV series
@@ -341,11 +340,7 @@ export default function VideoPlayer({
       ref={containerRef}
       onMouseMove={handleUserActivity}
       onTouchStart={handleUserActivity}
-      className={`fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden text-white font-sans transition-all duration-300 ${
-        isLandscapeMode
-          ? "rotate-90 origin-top-left !w-[100dvh] !h-[100dvw] translate-x-[100dvw] md:rotate-0 md:!w-full md:!h-full md:translate-x-0"
-          : "w-full h-full"
-      }`}
+      className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden text-white font-sans w-full h-full"
     >
       {/* ============================================================ */}
       {/* 1. ACTUAL FILMFLEX.MP4 INTRO - 100% FULLSCREEN COVER          */}
@@ -374,7 +369,7 @@ export default function VideoPlayer({
         /* 2. CLOUD HD VIDEO PLAYER (100% FULL SCREEN & INTERACTIVE)    */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {/* Iframe with direct touch/click interaction */}
+          {/* Iframe with direct touch/click interaction and ad-blocking sandbox */}
           <iframe
             key={`${activeServer}-${imdbId}-${currentSeason}-${currentEpisode}`}
             src={getStreamUrl()}
@@ -382,6 +377,7 @@ export default function VideoPlayer({
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             referrerPolicy="origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-fullscreen"
           />
 
           {/* Resumed Notification Badge */}

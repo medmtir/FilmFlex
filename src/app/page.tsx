@@ -12,7 +12,8 @@ import AdminDashboard from "@/components/AdminDashboard";
 import AuthModal from "@/components/AuthModal";
 import ScreenLimitModal from "@/components/ScreenLimitModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
-import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass } from "lucide-react";
+import CategoryGridView from "@/components/CategoryGridView";
+import { Home, Film, Tv, Flame, Bookmark, Sparkles, Compass, User } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
 import {
   INITIAL_MOVIES,
@@ -397,7 +398,7 @@ export default function HomePage() {
     featuredMovie = tunisianMovies[0]; // Dachra
   }
 
-  const showBillboard = !searchQuery && ["home", "series", "anime", "tunisien"].includes(activeTab);
+  const showBillboard = !searchQuery && ["home", "series"].includes(activeTab);
 
   return (
     <div className="relative min-h-screen bg-[#0e0e12] text-white overflow-x-hidden selection:bg-[#E50914] selection:text-white">
@@ -488,73 +489,36 @@ export default function HomePage() {
             </div>
           )}
 
-          {/* DEDICATED ANIME TAB */}
+          {/* DEDICATED ANIME FULL PAGE CATALOG */}
           {activeTab === "anime" && (
-            <>
-              <MovieRow
-                title="Anime & Manga Japonais 🎌"
-                movies={animeMovies}
-                filterGenres={["Shonen", "Action", "Dark Fantasy", "Aventure", "Romance"]}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-              <MovieRow
-                title="Séries Shonen & Combats Épiques"
-                movies={animeMovies.filter((a) => a.genres.includes("Shonen"))}
-                filterGenres={["Action", "Fantasy", "Supernatural"]}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-              <MovieRow
-                title="Chefs-d'œuvre de l'Animation (Ghibli & Films)"
-                movies={animeMovies.filter((a) => a.type === "movie")}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-            </>
+            <CategoryGridView
+              title="Catalogue Complet Anime & Manga 🎌"
+              badge="Anime Japonais (VOSTFR & VF)"
+              description="Explorez tous les animés en streaming 4K Ultra HD sans coupure : Shonen épiques, dark fantasy, combats légendaires et chefs-d'œuvre du Studio Ghibli."
+              movies={animeMovies}
+              filterGenres={["Shonen", "Action", "Dark Fantasy", "Aventure", "Romance", "Animation", "Thriller"]}
+              progressList={progressList}
+              myListIds={myListIds}
+              onPlay={(m) => handlePlayMovie(m)}
+              onToggleMyList={handleToggleMyList}
+              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+            />
           )}
 
-          {/* DEDICATED TUNISIAN CINEMA TAB */}
+          {/* DEDICATED TUNISIAN CINEMA FULL PAGE CATALOG */}
           {activeTab === "tunisien" && (
-            <>
-              <MovieRow
-                title="Cinéma Tunisien 🇹🇳 (Films & Séries Phares)"
-                movies={tunisianMovies}
-                filterGenres={["Comédie", "Drame", "Horreur", "Classique"]}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-              <MovieRow
-                title="Comédies Tunisiennes Cultes"
-                movies={tunisianMovies.filter((t) => t.genres.includes("Comédie"))}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-              <MovieRow
-                title="Drames Sociaux & Séries"
-                movies={tunisianMovies.filter((t) => t.genres.includes("Drame"))}
-                progressList={progressList}
-                myListIds={myListIds}
-                onPlay={(m) => handlePlayMovie(m)}
-                onToggleMyList={handleToggleMyList}
-                onOpenModal={(movie) => setSelectedMovieForModal(movie)}
-              />
-            </>
+            <CategoryGridView
+              title="Cinéma & Séries Tunisiens 🇹🇳"
+              badge="Production 100% Tunisienne"
+              description="Retrouvez les plus grandes œuvres du cinéma tunisien et les séries cultes en haute définition : comédies inoubliables (Choufly Hal), drames sociaux poignants (Nouba) et cinéma d'auteur (Dachra)."
+              movies={tunisianMovies}
+              filterGenres={["Comédie", "Drame", "Horreur", "Classique"]}
+              progressList={progressList}
+              myListIds={myListIds}
+              onPlay={(m) => handlePlayMovie(m)}
+              onToggleMyList={handleToggleMyList}
+              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+            />
           )}
 
           {/* DEDICATED SERIES TAB */}
@@ -619,6 +583,10 @@ export default function HomePage() {
                   onPlay={(m) => handlePlayMovie(m)}
                   onToggleMyList={handleToggleMyList}
                   onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  onViewAll={() => {
+                    setActiveTab("tunisien");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 />
               )}
 
@@ -633,6 +601,10 @@ export default function HomePage() {
                   onPlay={(m) => handlePlayMovie(m)}
                   onToggleMyList={handleToggleMyList}
                   onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  onViewAll={() => {
+                    setActiveTab("anime");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 />
               )}
 
@@ -661,6 +633,10 @@ export default function HomePage() {
                   onPlay={(m) => handlePlayMovie(m)}
                   onToggleMyList={handleToggleMyList}
                   onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  onViewAll={() => {
+                    setActiveTab("movies");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
                 />
               )}
 
@@ -813,15 +789,14 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* 8. Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e12]/95 backdrop-blur-lg border-t border-neutral-800/80 px-2 py-1.5 flex items-center justify-around">
+      {/* 8. Mobile Bottom Navigation Bar (Dedicated Mobile App Layout) */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0e0e12]/95 backdrop-blur-2xl border-t border-neutral-800/90 px-1 py-1.5 flex items-center justify-around select-none shadow-[0_-10px_30px_rgba(0,0,0,0.9)] pb-[max(0.375rem,env(safe-area-inset-bottom))]">
         {[
-          { id: "home", label: "Home", icon: Home },
-          { id: "movies", label: "Movies", icon: Film },
-          { id: "series", label: "TV", icon: Tv },
-          { id: "anime", label: "Anime", icon: Sparkles },
-          { id: "tunisien", label: "Tunisien", icon: Compass },
-          { id: "mylist", label: "List", icon: Bookmark },
+          { id: "home", label: "Accueil", icon: Home },
+          { id: "anime", label: "Animés 🎌", icon: Sparkles },
+          { id: "tunisien", label: "Tunisien 🇹🇳", icon: Compass },
+          { id: "movies", label: "Films", icon: Film },
+          { id: "series", label: "Séries", icon: Tv },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id && !searchQuery;
@@ -833,22 +808,45 @@ export default function HomePage() {
                 setSearchQuery("");
                 window.scrollTo({ top: 0, behavior: "smooth" });
               }}
-              className={`flex flex-col items-center justify-center py-1 px-2.5 rounded-lg transition-all cursor-pointer ${
-                isActive ? "text-white" : "text-neutral-500 hover:text-neutral-300"
+              className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer ${
+                isActive ? "text-[#E50914] font-bold scale-105" : "text-neutral-400 hover:text-white"
               }`}
             >
               <div className="relative">
-                <Icon className={`w-5 h-5 ${isActive ? "text-[#E50914]" : ""}`} />
+                <Icon className={`w-5 h-5 ${isActive ? "stroke-[2.5]" : "stroke-[1.8]"}`} />
                 {isActive && (
-                  <span className="absolute -top-1 -right-1 w-1.5 h-1.5 rounded-full bg-[#E50914]" />
+                  <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-[#E50914] shadow-[0_0_8px_#E50914]" />
                 )}
               </div>
-              <span className={`text-[10px] mt-0.5 font-medium ${isActive ? "text-white font-bold" : ""}`}>
+              <span className={`text-[10px] mt-1 font-medium truncate max-w-[60px] ${isActive ? "text-[#E50914] font-bold" : ""}`}>
                 {tab.label}
               </span>
             </button>
           );
         })}
+
+        {/* Account / Login Tab */}
+        <button
+          onClick={() => {
+            if (user) {
+              setShowProfileGate(true);
+            } else {
+              setShowAuthModal(true);
+            }
+          }}
+          className="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all text-neutral-400 hover:text-white cursor-pointer"
+        >
+          {user ? (
+            <div className="w-5 h-5 rounded-full bg-[#E50914] flex items-center justify-center text-[10px] font-black text-white shadow">
+              {user.name ? user.name[0].toUpperCase() : "U"}
+            </div>
+          ) : (
+            <User className="w-5 h-5 stroke-[1.8]" />
+          )}
+          <span className="text-[10px] mt-1 font-medium truncate max-w-[60px]">
+            {user ? "Compte" : "Connexion"}
+          </span>
+        </button>
       </nav>
     </div>
   );

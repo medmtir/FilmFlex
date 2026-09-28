@@ -20,7 +20,7 @@
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|keyboardHidden|smallestScreenSize|screenLayout"
             android:exported="true"
-            android:screenOrientation="unspecified"
+            android:screenOrientation="sensor"
             android:theme="@style/Theme.FilmFlex">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

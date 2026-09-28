@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Lock, Mail, User, ShieldCheck, Sparkles, LogIn, UserPlus, Check } from "lucide-react";
+import { X, Lock, Mail, User, LogIn, UserPlus } from "lucide-react";
 import FilmFlexLogo from "./FilmFlexLogo";
 import { UserAccount } from "@/types";
 import { loginUser, registerUser } from "@/lib/auth";
@@ -61,17 +61,6 @@ export default function AuthModal({
       } else {
         setError(res.error || "Échec de l'inscription.");
       }
-    }
-  };
-
-  const handleQuickLogin = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
-    const res = loginUser(demoEmail, demoPass);
-    if (res.success && res.user) {
-      onSuccess(res.user);
-      onClose();
     }
   };
 
@@ -212,40 +201,6 @@ export default function AuthModal({
             )}
           </button>
         </form>
-
-        {/* Quick Demo Access Bar */}
-        {mode === "login" && (
-          <div className="mt-6 pt-5 border-t border-neutral-800">
-            <p className="text-[11px] font-bold text-neutral-400 mb-2 uppercase tracking-wider">
-              Comptes Démo Rapides :
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("admin@filmflex.tv", "admin123")}
-                className="p-2 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-700/50 text-left transition-all"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-red-300">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#E50914]" />
-                  <span>Admin FilmFlex</span>
-                </div>
-                <div className="text-[10px] text-neutral-400 truncate">admin@filmflex.tv</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin("subscriber@filmflex.tv", "filmflex2026")}
-                className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-left transition-all"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Client VIP</span>
-                </div>
-                <div className="text-[10px] text-neutral-400 truncate">subscriber@filmflex.tv</div>
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
