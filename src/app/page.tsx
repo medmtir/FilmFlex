@@ -8,10 +8,13 @@ import MovieModal from "@/components/MovieModal";
 import VideoPlayer from "@/components/VideoPlayer";
 import ProfileGate from "@/components/ProfileGate";
 import PaywallModal from "@/components/PaywallModal";
+import AdminDashboard from "@/components/AdminDashboard";
+import AuthModal from "@/components/AuthModal";
+import ScreenLimitModal from "@/components/ScreenLimitModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
 import { Home, Film, Tv, Flame, Bookmark } from "lucide-react";
 import { Movie, Profile, UserAccount, WatchProgress } from "@/types";
-import { INITIAL_MOVIES, INITIAL_SERIES } from "@/lib/constants";
+import { INITIAL_MOVIES, INITIAL_SERIES, DEFAULT_PROFILES } from "@/lib/constants";
 import {
   getStoredUser,
   saveUser,
@@ -19,6 +22,7 @@ import {
   getMyList,
   toggleMyList as toggleMyListStorage,
 } from "@/lib/storage";
+import { checkSubscriptionValidity, startWatchingSession } from "@/lib/auth";
 import {
   fetchProgressFromSupabase,
   fetchMyListFromSupabase,
@@ -40,6 +44,10 @@ export default function HomePage() {
   const [playerSeason, setPlayerSeason] = useState<number>(1);
   const [playerEpisode, setPlayerEpisode] = useState<number>(1);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showScreenLimitModal, setShowScreenLimitModal] = useState(false);
+  const [limitActiveScreens, setLimitActiveScreens] = useState(2);
 
   // 4. Profile-specific state (Continue Watching & My List)
   const [progressList, setProgressList] = useState<WatchProgress[]>([]);
@@ -234,8 +242,25 @@ export default function HomePage() {
   };
 
   const handlePlayMovie = (movie: Movie, season = 1, episode = 1) => {
-    if (!user?.isSubscribed) {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // 1. Subscription Check (auto cuts if subscription has expired)
+    const refreshed = checkSubscriptionValidity(user);
+    if (!refreshed.isSubscribed) {
+      setUser(refreshed);
+      saveUser(refreshed);
       setShowPaywall(true);
+      return;
+    }
+
+    // 2. Max 2 Simultaneous Screens Check
+    const sessionRes = startWatchingSession(refreshed.id, refreshed.maxScreens || 2);
+    if (!sessionRes.allowed) {
+      setLimitActiveScreens(sessionRes.activeCount);
+      setShowScreenLimitModal(true);
       return;
     }
 
@@ -340,6 +365,7 @@ export default function HomePage() {
         profile={activeProfile}
         initialSeason={playerSeason}
         initialEpisode={playerEpisode}
+        userId={user.id}
         onBack={() => {
           setPlayingMovie(null);
           setProgressList(getProfileProgress(activeProfile.id));
@@ -358,6 +384,8 @@ export default function HomePage() {
         activeProfile={activeProfile}
         onOpenProfileGate={() => setShowProfileGate(true)}
         onOpenPaywall={() => setShowPaywall(true)}
+        onOpenAdminDashboard={() => setShowAdminDashboard(true)}
+        onOpenAuthModal={() => setShowAuthModal(true)}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         activeTab={activeTab}
@@ -620,6 +648,39 @@ export default function HomePage() {
         onClose={() => setShowPaywall(false)}
         user={user}
         onSubscribe={handleSubscribe}
+      />
+
+      {/* 6b. Admin Dashboard Modal (Abonnements & Écrans) */}
+      <AdminDashboard
+        isOpen={showAdminDashboard}
+        onClose={() => setShowAdminDashboard(false)}
+        currentUser={user}
+      />
+
+      {/* 6c. Auth Modal (Connexion / Inscription) */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={(loggedInUser) => {
+          setUser(loggedInUser);
+          saveUser(loggedInUser);
+          const firstProf = loggedInUser.profiles?.[0] || DEFAULT_PROFILES[0];
+          setActiveProfile(firstProf);
+        }}
+      />
+
+      {/* 6d. Screen Limit Modal (Max 2 Écrans Simultanés) */}
+      <ScreenLimitModal
+        isOpen={showScreenLimitModal}
+        onClose={() => setShowScreenLimitModal(false)}
+        onRetry={() => {
+          setShowScreenLimitModal(false);
+          if (user && selectedMovieForModal) {
+            handlePlayMovie(selectedMovieForModal);
+          }
+        }}
+        activeCount={limitActiveScreens}
+        maxScreens={user.maxScreens || 2}
       />
 
       {/* 7. Footer */}

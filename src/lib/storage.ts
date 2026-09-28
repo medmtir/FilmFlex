@@ -1,5 +1,6 @@
 import { Profile, UserAccount, WatchProgress, Movie } from "@/types";
 import { DEFAULT_PROFILES, INITIAL_MOVIES } from "./constants";
+import { checkSubscriptionValidity } from "./auth";
 import {
   syncProgressToSupabase,
   syncMyListToSupabase,
@@ -13,13 +14,18 @@ const MY_LIST_STORAGE_PREFIX = "filmflex_mylist_";
 export function getStoredUser(): UserAccount {
   if (typeof window === "undefined") {
     return {
-      id: "usr_guest",
+      id: "usr_vip_client",
       email: "subscriber@filmflex.tv",
-      isSubscribed: true, // Default active subscriber for seamless experience
+      role: "user",
+      name: "Client VIP",
+      isSubscribed: true,
       subscriptionPlan: "VIP_MONTHLY",
+      subscriptionStatus: "active",
+      subscriptionStartedAt: new Date().toISOString(),
       subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       profiles: DEFAULT_PROFILES,
       activeProfileId: DEFAULT_PROFILES[0].id,
+      maxScreens: 2,
     };
   }
 
@@ -27,27 +33,42 @@ export function getStoredUser(): UserAccount {
     const raw = localStorage.getItem(USER_STORAGE_KEY);
     if (!raw) {
       const initial: UserAccount = {
-        id: "usr_guest",
+        id: "usr_vip_client",
         email: "subscriber@filmflex.tv",
+        role: "user",
+        name: "Client VIP",
         isSubscribed: true,
         subscriptionPlan: "VIP_MONTHLY",
+        subscriptionStatus: "active",
+        subscriptionStartedAt: new Date().toISOString(),
         subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
         profiles: DEFAULT_PROFILES,
         activeProfileId: DEFAULT_PROFILES[0].id,
+        maxScreens: 2,
       };
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(initial));
       return initial;
     }
-    return JSON.parse(raw);
+    const parsed: UserAccount = JSON.parse(raw);
+    const validated = checkSubscriptionValidity(parsed);
+    if (validated.isSubscribed !== parsed.isSubscribed) {
+      saveUser(validated);
+    }
+    return validated;
   } catch {
     return {
-      id: "usr_guest",
+      id: "usr_vip_client",
       email: "subscriber@filmflex.tv",
+      role: "user",
+      name: "Client VIP",
       isSubscribed: true,
       subscriptionPlan: "VIP_MONTHLY",
+      subscriptionStatus: "active",
+      subscriptionStartedAt: new Date().toISOString(),
       subscriptionExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       profiles: DEFAULT_PROFILES,
       activeProfileId: DEFAULT_PROFILES[0].id,
+      maxScreens: 2,
     };
   }
 }

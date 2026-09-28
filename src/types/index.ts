@@ -70,15 +70,24 @@ export interface WatchProgress {
 }
 
 export type SubscriptionPlan = "FREE_TRIAL" | "VIP_MONTHLY" | "VIP_ANNUAL";
+export type SubscriptionStatus = "active" | "expired" | "cancelled" | "pending";
 
 export interface UserAccount {
   id: string;
   email: string;
+  password?: string;
+  name?: string;
+  role: "user" | "admin";
   isSubscribed: boolean;
   subscriptionPlan?: SubscriptionPlan;
+  subscriptionStatus?: SubscriptionStatus;
+  subscriptionStartedAt?: string;
   subscriptionExpiresAt?: string;
   profiles: Profile[]; // Maximum 2 profiles
   activeProfileId: string;
+  maxScreens: number; // Maximum concurrent streams (default 2)
+  activeScreens?: number;
+  createdAt?: string;
 }
 
 export interface CategoryRow {

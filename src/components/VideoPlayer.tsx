@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Movie, Profile, Episode } from "@/types";
 import { saveMovieProgress, getMovieResumeTime } from "@/lib/storage";
+import { startWatchingSession, stopWatchingSession } from "@/lib/auth";
 
 interface VideoPlayerProps {
   movie: Movie;
@@ -24,6 +25,7 @@ interface VideoPlayerProps {
   onBack: () => void;
   initialSeason?: number;
   initialEpisode?: number;
+  userId?: string;
 }
 
 type ServerType = "server1" | "server2" | "server3";
@@ -62,9 +64,23 @@ export default function VideoPlayer({
   onBack,
   initialSeason = 1,
   initialEpisode = 1,
+  userId,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const introVideoRef = useRef<HTMLVideoElement>(null);
+
+  // Active watching session heartbeat (enforcing max 2 concurrent screens)
+  useEffect(() => {
+    if (!userId) return;
+    startWatchingSession(userId);
+    const interval = setInterval(() => {
+      startWatchingSession(userId);
+    }, 15000);
+    return () => {
+      clearInterval(interval);
+      stopWatchingSession(userId);
+    };
+  }, [userId]);
 
   // Intro video state
   const [isPlayingIntro, setIsPlayingIntro] = useState(true);
