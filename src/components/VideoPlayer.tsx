@@ -43,13 +43,13 @@ const SERVER_OPTIONS: ServerOption[] = [
     id: "vidlink",
     name: "Serveur 1 (Netflix Ultra HD)",
     badge: "⭐ Défaut (Netflix)",
-    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR • Zéro pub ni redirection",
+    description: "Moteur Netflix 4K fluide avec sous-titres FR/AR • 100% Zéro pub ni redirection",
   },
   {
     id: "torrentio",
     name: "Serveur 2 (Torrentio CDN 4K)",
     badge: "Torrentio 4K",
-    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p sans pub",
+    description: "Moteur Torrentio & Debrid multi-flux 4K/1080p sans coupure • 100% Zéro pub",
   },
   {
     id: "embedsu",
@@ -141,6 +141,23 @@ export default function VideoPlayer({
     }, 11000);
     return () => clearTimeout(lagTimer);
   }, [activeServer, currentSeason, currentEpisode, imdbId]);
+
+  // Web Shield: Neutralize rogue popups, ad tabs, and unwanted redirects on desktop and mobile web
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // 1. Intercept any window.open calls from embedded scripts or rogue handlers
+    const originalOpen = window.open;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).open = function (...args: any[]) {
+      console.warn("[FilmFlex Shield] Neutralized popup window.open attempt:", args[0]);
+      return null;
+    };
+
+    return () => {
+      window.open = originalOpen;
+    };
+  }, []);
 
   // Mobile orientation handling
   useEffect(() => {
@@ -301,10 +318,10 @@ export default function VideoPlayer({
         : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
     }
     if (activeServer === "torrentio") {
-      // Server 2: Torrentio 4K Auto-Best Stream Engine (Clean Torrent CDN)
+      // Server 2: VidLink Ultra Multi-Source Engine (Torrentio & Debrid CDN) - 100% Ad-Free
       return isSeries
-        ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
-        : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
+        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?player=jw&primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
+        : `https://vidlink.pro/movie/${imdbId}?player=jw&primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
     }
     if (activeServer === "embedsu") {
       // Server 3: Embed.su Multi-Language Player

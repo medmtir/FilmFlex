@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown } from "lucide-react";
+import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download } from "lucide-react";
 import { Movie, Episode } from "@/types";
 
 interface MovieModalProps {
@@ -26,6 +26,40 @@ export default function MovieModal({
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
+
+  const handleDownload = (ep?: Episode) => {
+    if (!movie) return;
+    const itemTitle = ep ? `${movie.title} - S${ep.season}E${ep.episode}` : movie.title;
+    setNotice(`Téléchargement lancé : ${itemTitle}`);
+    setTimeout(() => setNotice(null), 3500);
+
+    const streamDownloadUrl = `/api/stream/${movie.imdbId || movie.id}?quality=1080p${
+      ep ? `&season=${ep.season}&episode=${ep.episode}` : ""
+    }`;
+    const a = document.createElement("a");
+    a.href = streamDownloadUrl;
+    a.download = `${movie.title.replace(/\s+/g, "_")}${ep ? `_S${ep.season}E${ep.episode}` : ""}.mp4`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleShare = () => {
+    if (!movie) return;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      navigator.share({
+        title: movie.title,
+        text: `Regardez ${movie.title} en 4K Ultra HD sur FilmFlex !`,
+        url: window.location.href,
+      }).catch(() => {});
+    } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(window.location.href);
+      setNotice("Lien du film copié dans le presse-papier !");
+      setTimeout(() => setNotice(null), 3000);
+    }
+  };
 
   const isSeries = movie?.type === "series" || movie?.duration.toLowerCase().includes("season") || movie?.duration.toLowerCase().includes("série");
 
@@ -80,10 +114,18 @@ export default function MovieModal({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/70 hover:bg-neutral-800 flex items-center justify-center text-white transition-colors"
+          className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-black/70 hover:bg-neutral-800 flex items-center justify-center text-white transition-colors cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
+
+        {/* Notice Toast */}
+        {notice && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-full bg-emerald-950/95 border border-emerald-500/50 text-emerald-300 text-xs font-semibold flex items-center gap-2 shadow-2xl animate-fade-in backdrop-blur-md">
+            <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{notice}</span>
+          </div>
+        )}
 
         {/* Top Media: Trailer or High-Res Backdrop */}
         <div className="relative aspect-[16/9] w-full bg-black">
@@ -123,24 +165,49 @@ export default function MovieModal({
                 {movie.title}
               </h1>
 
-              <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                 <button
                   onClick={() => onPlay(movie, isSeries ? selectedSeason : undefined, isSeries ? 1 : undefined)}
-                  className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 bg-white hover:bg-neutral-200 text-black font-bold rounded text-xs sm:text-sm transition-colors shadow-lg"
+                  className="flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 bg-[#E50914] hover:bg-[#b80710] text-white font-black rounded-xl text-xs sm:text-sm tracking-wider uppercase transition-all shadow-xl shadow-[#E50914]/40 hover:scale-105 active:scale-95 cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-black" />
-                  <span>{isSeries ? "Lancer la série" : "Play"}</span>
+                  <Play className="w-4 h-4 fill-white" />
+                  <span>{isSeries ? "Lancer la série" : "PLAY"}</span>
                 </button>
 
                 <button
                   onClick={() => onToggleMyList(movie)}
-                  className="w-9 h-9 rounded-full border border-neutral-400 hover:border-white bg-black/40 text-white flex items-center justify-center transition-colors"
+                  className="w-10 h-10 rounded-full border border-neutral-400 hover:border-white bg-black/50 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                  title={isInMyList ? "Retirer de Ma Liste" : "Ajouter à Ma Liste"}
                 >
                   {isInMyList ? <Check className="w-4 h-4 text-emerald-400" /> : <Plus className="w-4 h-4" />}
                 </button>
 
-                <button className="w-9 h-9 rounded-full border border-neutral-400 hover:border-white bg-black/40 text-white flex items-center justify-center transition-colors">
-                  <ThumbsUp className="w-4 h-4" />
+                <button
+                  onClick={() => setIsLiked(!isLiked)}
+                  className={`w-10 h-10 rounded-full border transition-transform hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center ${
+                    isLiked
+                      ? "bg-white text-black border-white"
+                      : "border-neutral-400 hover:border-white bg-black/50 text-white"
+                  }`}
+                  title="J'aime ce titre"
+                >
+                  <ThumbsUp className={`w-4 h-4 ${isLiked ? "fill-black" : ""}`} />
+                </button>
+
+                <button
+                  onClick={() => handleDownload()}
+                  className="w-10 h-10 rounded-full border border-neutral-400 hover:border-white bg-black/50 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                  title="Télécharger en 1080p Full HD"
+                >
+                  <Download className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={handleShare}
+                  className="w-10 h-10 rounded-full border border-neutral-400 hover:border-white bg-black/50 text-white flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer"
+                  title="Partager"
+                >
+                  <Share2 className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -201,7 +268,10 @@ export default function MovieModal({
           {isSeries && (
             <div className="pt-6 border-t border-neutral-800 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Épisodes</h3>
+                <div>
+                  <div className="w-12 h-1 bg-[#E50914] rounded-full mb-1.5" />
+                  <h3 className="text-xl font-black text-white tracking-wide uppercase">Épisodes</h3>
+                </div>
 
                 {seasonsList.length > 1 && (
                   <div className="relative">
@@ -262,8 +332,20 @@ export default function MovieModal({
                         </div>
                       </div>
 
-                      <div className="hidden sm:block text-xs text-neutral-500 font-mono">
-                        ~45m
+                      <div className="flex items-center gap-3 shrink-0 ml-4">
+                        <div className="hidden sm:block text-xs text-neutral-500 font-mono">
+                          ~45m
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(ep);
+                          }}
+                          className="w-8 h-8 rounded-full border border-neutral-700 hover:border-white bg-black/40 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+                          title="Télécharger cet épisode en 1080p Full HD"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   ))}

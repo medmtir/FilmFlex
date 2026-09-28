@@ -2,7 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const targetUrl = searchParams.get("url");
+  let targetUrl = searchParams.get("url");
+  const id = searchParams.get("id");
+  const season = searchParams.get("season");
+  const episode = searchParams.get("episode");
+
+  if (!targetUrl && id) {
+    const isSeries = Boolean(season && episode);
+    const redirectUrl = isSeries
+      ? `https://vidlink.pro/tv/${id}/${season}/${episode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
+      : `https://vidlink.pro/movie/${id}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
+    return NextResponse.redirect(redirectUrl);
+  }
 
   if (!targetUrl) {
     return new NextResponse("Missing url parameter", { status: 400 });

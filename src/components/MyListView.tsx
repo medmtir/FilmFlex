@@ -67,7 +67,7 @@ export default function MyListView({
   }, [movies, activeFilter, activeSort, progressList]);
 
   return (
-    <div className="pt-20 sm:pt-24 pb-28 px-3 sm:px-6 md:px-8 max-w-3xl mx-auto select-none animate-fade-in text-white min-h-screen">
+    <div className="pt-20 sm:pt-24 pb-28 px-3 sm:px-6 md:px-8 max-w-4xl lg:max-w-5xl mx-auto select-none animate-fade-in text-white min-h-screen">
       {/* 1. Header (Matching media_1790623063448.png: ← My List, Edit Icon) */}
       <div className="flex items-center justify-between mb-4 pb-2">
         <div className="flex items-center gap-3">
@@ -183,7 +183,7 @@ export default function MyListView({
                 className="group relative flex items-center justify-between gap-3.5 p-2 rounded-2xl bg-neutral-900/60 hover:bg-neutral-850 border border-neutral-800/70 hover:border-neutral-700 transition-all cursor-pointer shadow-md"
               >
                 {/* Left: 16:9 Thumbnail with red FilmFlex badge */}
-                <div className="relative w-32 sm:w-40 aspect-video rounded-xl overflow-hidden bg-neutral-950 shrink-0">
+                <div className="relative w-32 sm:w-44 md:w-52 aspect-video rounded-xl overflow-hidden bg-neutral-950 shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={movie.backdropUrl || movie.posterUrl}
