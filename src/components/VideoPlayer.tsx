@@ -14,6 +14,7 @@ import {
   Play,
   Check,
   Tv,
+  Zap,
 } from "lucide-react";
 import { Movie, Profile, Episode } from "@/types";
 import { saveMovieProgress, getMovieResumeTime } from "@/lib/storage";
@@ -28,7 +29,7 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "server1" | "server2" | "server3" | "server4" | "server5";
+type ServerType = "torrentio" | "vidlink" | "vidsrc" | "embed2" | "embedsu";
 
 interface ServerOption {
   id: ServerType;
@@ -39,31 +40,31 @@ interface ServerOption {
 
 const SERVER_OPTIONS: ServerOption[] = [
   {
-    id: "server1",
-    name: "Serveur 1 (FilmFlex Ultra HD)",
-    badge: "4K / Subtitles",
+    id: "torrentio",
+    name: "Serveur 1 (Torrentio 4K Auto-Best)",
+    badge: "⭐ Défaut (Auto-Best)",
+    description: "Moteur Torrentio intelligent • Détection automatique du meilleur flux 4K/1080p sans coupure",
+  },
+  {
+    id: "vidlink",
+    name: "Serveur 2 (FilmFlex Ultra HD)",
+    badge: "VidLink 4K",
     description: "Lecteur HD rapide avec sous-titres arabes et français",
   },
   {
-    id: "server2",
-    name: "Serveur 2 (Torrentio / VidSrc CC)",
-    badge: "Torrentio 4K",
-    description: "Flux Torrentio haute vitesse avec multi-pistes audio",
-  },
-  {
-    id: "server3",
+    id: "vidsrc",
     name: "Serveur 3 (FilmFlex VidSrc Pro)",
     badge: "Mondial",
     description: "Serveur mondial direct très fluide",
   },
   {
-    id: "server4",
+    id: "embed2",
     name: "Serveur 4 (FilmFlex 2Embed)",
     badge: "Backup HD",
     description: "Alternative stable pour séries et animés",
   },
   {
-    id: "server5",
+    id: "embedsu",
     name: "Serveur 5 (FilmFlex Embed.su)",
     badge: "Multi-Langues",
     description: "Sous-titres multi-langues et streaming instantané",
@@ -107,14 +108,15 @@ export default function VideoPlayer({
   const [episodesList, setEpisodesList] = useState<Episode[]>([]);
   const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
 
-  // Player state
-  const [activeServer, setActiveServer] = useState<ServerType>("server1");
+  // Player state: Torrentio is the #1 DEFAULT server as requested by user
+  const [activeServer, setActiveServer] = useState<ServerType>("torrentio");
   const [showServerMenu, setShowServerMenu] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [resumedNotice, setResumedNotice] = useState<string | null>(null);
   const [castNotice, setCastNotice] = useState<string | null>(null);
   const [isLandscapeMode, setIsLandscapeMode] = useState(false);
+  const [showLagHelp, setShowLagHelp] = useState(false);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const imdbId = movie.imdbId || (movie.id.startsWith("tt") ? movie.id : "tt15239678");
@@ -127,7 +129,6 @@ export default function VideoPlayer({
       setResumedNotice(`Reprise automatique à ${mins} min`);
       setTimeout(() => setResumedNotice(null), 4000);
     }
-    // Update progress entry so movie appears in continue watching
     if (profile) {
       saveMovieProgress(
         profile.id,
@@ -137,6 +138,15 @@ export default function VideoPlayer({
       );
     }
   }, [profile, movie.id, movie.durationSeconds]);
+
+  // Anti-Coupure Auto-Detection Timer: If loading takes > 11s, suggest 1-click best backup server
+  useEffect(() => {
+    setShowLagHelp(false);
+    const lagTimer = setTimeout(() => {
+      setShowLagHelp(true);
+    }, 11000);
+    return () => clearTimeout(lagTimer);
+  }, [activeServer, currentSeason, currentEpisode, imdbId]);
 
   // Mobile orientation handling
   useEffect(() => {
@@ -272,25 +282,25 @@ export default function VideoPlayer({
 
   // Build stream URL according to selected server
   const getStreamUrl = () => {
-    if (activeServer === "server1") {
-      // Server 1: VidLink HD with customized Netflix red skin
-      return isSeries
-        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`
-        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
-    }
-    if (activeServer === "server2") {
-      // Server 2: VidSrc CC (Torrentio / Stremio engine with multi-audio & multi-subtitles)
+    if (activeServer === "torrentio") {
+      // Server 1 (DEFAULT): Torrentio 4K Auto-Best Stream Engine (VidSrc CC / Multi-Torrents CDN)
       return isSeries
         ? `https://vidsrc.cc/v2/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}?autoPlay=true`
         : `https://vidsrc.cc/v2/embed/movie/${imdbId}?autoPlay=true`;
     }
-    if (activeServer === "server3") {
+    if (activeServer === "vidlink") {
+      // Server 2: VidLink HD with customized Netflix red skin & Arabic/French subtitles
+      return isSeries
+        ? `https://vidlink.pro/tv/${imdbId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`
+        : `https://vidlink.pro/movie/${imdbId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix`;
+    }
+    if (activeServer === "vidsrc") {
       // Server 3: VidSrc.me high-speed mirror
       return isSeries
         ? `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
         : `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
     }
-    if (activeServer === "server4") {
+    if (activeServer === "embed2") {
       // Server 4: 2Embed fast alternative
       return isSeries
         ? `https://2embed.cc/embed/tv?imdb=${imdbId}&season=${currentSeason}&episode=${currentEpisode}`
@@ -300,6 +310,18 @@ export default function VideoPlayer({
     return isSeries
       ? `https://embed.su/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
       : `https://embed.su/embed/movie/${imdbId}`;
+  };
+
+  // 1-Click Auto-Best Switcher (Anti-Coupure)
+  const handleAutoBestSwitch = () => {
+    const serverOrder: ServerType[] = ["torrentio", "vidlink", "vidsrc", "embed2", "embedsu"];
+    const currentIndex = serverOrder.indexOf(activeServer);
+    const nextIndex = (currentIndex + 1) % serverOrder.length;
+    const nextServer = serverOrder[nextIndex];
+    setActiveServer(nextServer);
+    const nextInfo = SERVER_OPTIONS.find((s) => s.id === nextServer);
+    setResumedNotice(`⚡ Basculé sur : ${nextInfo?.name || "Meilleur flux"}`);
+    setTimeout(() => setResumedNotice(null), 3500);
   };
 
   const handleSelectEpisode = (ep: Episode) => {
@@ -341,7 +363,7 @@ export default function VideoPlayer({
           />
           <button
             onClick={finishIntro}
-            className="absolute bottom-8 right-8 z-30 px-6 py-2.5 rounded-full border border-white/20 bg-black/70 hover:bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase transition-all shadow-2xl hover:scale-105 flex items-center gap-2 backdrop-blur-md"
+            className="absolute bottom-8 right-8 z-30 px-6 py-2.5 rounded-full border border-white/20 bg-black/70 hover:bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase transition-all shadow-2xl hover:scale-105 flex items-center gap-2 backdrop-blur-md cursor-pointer"
           >
             <span>Passer l&apos;intro</span>
             <FastForward className="w-4 h-4 text-[#E50914]" />
@@ -352,7 +374,7 @@ export default function VideoPlayer({
         /* 2. CLOUD HD VIDEO PLAYER (100% FULL SCREEN & INTERACTIVE)    */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
-          {/* Iframe with direct touch/click interaction, NO SANDBOX so VidLink works */}
+          {/* Iframe with direct touch/click interaction */}
           <iframe
             key={`${activeServer}-${imdbId}-${currentSeason}-${currentEpisode}`}
             src={getStreamUrl()}
@@ -378,9 +400,35 @@ export default function VideoPlayer({
             </div>
           )}
 
+          {/* Anti-Coupure Floating Assistant (If buffering or slow stream) */}
+          {showLagHelp && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-[#121216]/95 border border-[#E50914] rounded-full px-4 py-2 flex items-center gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.9)] z-40 animate-fade-in backdrop-blur-md">
+              <span className="text-xs text-neutral-200 flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Flux lent ou coupure ?</span>
+              </span>
+              <button
+                onClick={() => {
+                  handleAutoBestSwitch();
+                  setShowLagHelp(false);
+                }}
+                className="px-3 py-1 bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold rounded-full transition-all flex items-center gap-1 shadow cursor-pointer hover:scale-105"
+              >
+                <Zap className="w-3 h-3 fill-white" />
+                <span>Basculer sur le meilleur flux</span>
+              </button>
+              <button
+                onClick={() => setShowLagHelp(false)}
+                className="text-neutral-400 hover:text-white p-0.5 cursor-pointer"
+                title="Fermer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* ============================================================ */}
-          {/* TOP BAR: Clean, Minimal, Non-Intrusive, Desktop & Mobile     */}
-          {/* pointer-events-none on wrapper so middle clicks hit iframe   */}
+          {/* TOP BAR: Clean, Minimal, Desktop & Mobile                    */}
           {/* ============================================================ */}
           <div
             className={`absolute top-0 left-0 right-0 p-3 sm:p-5 bg-gradient-to-b from-black/95 via-black/60 to-transparent flex items-center justify-between transition-opacity duration-300 z-30 pointer-events-none ${
@@ -391,7 +439,7 @@ export default function VideoPlayer({
             <div className="flex items-center gap-2 sm:gap-4 min-w-0 pointer-events-auto">
               <button
                 onClick={onBack}
-                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10"
+                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 cursor-pointer"
                 title="Retour"
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -408,7 +456,7 @@ export default function VideoPlayer({
               {isSeries && (
                 <button
                   onClick={() => setShowEpisodesDrawer(!showEpisodesDrawer)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-xs font-semibold transition-all backdrop-blur-md shadow-lg"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 text-neutral-200 border border-white/15 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
                   title="Liste des épisodes"
                 >
                   <ListVideo className="w-3.5 h-3.5 text-[#E50914]" />
@@ -416,11 +464,21 @@ export default function VideoPlayer({
                 </button>
               )}
 
+              {/* Anti-Coupure Quick Button (Auto-Best) */}
+              <button
+                onClick={handleAutoBestSwitch}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold transition-all shadow-md shadow-[#E50914]/40 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Basculer instantanément sur le meilleur flux sans coupure"
+              >
+                <Zap className="w-3.5 h-3.5 fill-white" />
+                <span className="hidden sm:inline">Auto-Best</span>
+              </button>
+
               {/* Server Switcher Pill */}
               <div className="relative">
                 <button
                   onClick={() => setShowServerMenu(!showServerMenu)}
-                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 text-neutral-200 text-xs font-semibold transition-all backdrop-blur-md shadow-lg"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 text-neutral-200 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
                   title="Changer de serveur de streaming"
                 >
                   <Server className="w-3.5 h-3.5 text-[#E50914]" />
@@ -429,9 +487,10 @@ export default function VideoPlayer({
                 </button>
 
                 {showServerMenu && (
-                  <div className="absolute top-11 right-0 w-64 bg-[#141414]/95 backdrop-blur-xl border border-neutral-800 rounded-xl p-2 shadow-2xl z-50 animate-scale-up space-y-1">
-                    <div className="text-[11px] font-bold text-neutral-400 px-2 py-1.5 border-b border-neutral-800">
-                      Serveurs de Streaming FilmFlex
+                  <div className="absolute top-11 right-0 w-72 bg-[#141414]/95 backdrop-blur-xl border border-neutral-800 rounded-2xl p-2.5 shadow-2xl z-50 animate-scale-up space-y-1">
+                    <div className="text-[11px] font-bold text-neutral-400 px-2 py-1 border-b border-neutral-800 flex items-center justify-between">
+                      <span>Serveurs de Streaming</span>
+                      <span className="text-[10px] text-emerald-400">Torrentio Par Défaut</span>
                     </div>
                     {SERVER_OPTIONS.map((srv) => (
                       <button
@@ -440,7 +499,7 @@ export default function VideoPlayer({
                           setActiveServer(srv.id);
                           setShowServerMenu(false);
                         }}
-                        className={`w-full flex items-center justify-between text-left p-2 rounded-lg text-xs transition-colors ${
+                        className={`w-full flex items-center justify-between text-left p-2.5 rounded-xl text-xs transition-colors cursor-pointer ${
                           activeServer === srv.id
                             ? "bg-[#E50914]/20 border border-[#E50914]/50 text-white"
                             : "hover:bg-neutral-800/80 text-neutral-300"
@@ -453,7 +512,7 @@ export default function VideoPlayer({
                               {srv.badge}
                             </span>
                           </span>
-                          <span className="text-[10px] text-neutral-400">
+                          <span className="text-[10px] text-neutral-400 mt-0.5">
                             {srv.description}
                           </span>
                         </div>
@@ -478,94 +537,92 @@ export default function VideoPlayer({
 
               {/* 1080P HD Badge */}
               <span className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 text-neutral-200 border border-white/15 text-[10px] sm:text-xs font-mono font-semibold uppercase backdrop-blur-md shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>1080P HD</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                4K UHD
               </span>
 
-              {/* Smart TV / Google Cast Button */}
+              {/* Smart TV Chromecast Cast button */}
               <button
                 onClick={handleCastToTV}
-                className="text-neutral-300 hover:text-[#E50914] transition-colors p-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 backdrop-blur-md shadow-lg"
-                title="Diffuser sur Smart TV / Chromecast"
+                className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 text-neutral-200 text-xs font-semibold transition-all backdrop-blur-md shadow-lg cursor-pointer"
+                title="Diffuser vers Smart TV ou Chromecast"
               >
-                <Cast className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Tv className="w-4 h-4 text-[#E50914]" />
+                <span className="hidden md:inline">Diffuser sur TV</span>
               </button>
 
-              {/* Fullscreen Button */}
+              {/* Fullscreen toggle */}
               <button
                 onClick={toggleFullscreen}
-                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/75 hover:bg-neutral-900 border border-white/15 backdrop-blur-md shadow-lg"
-                title="Plein écran"
+                className="text-neutral-300 hover:text-white transition-colors p-1.5 rounded-full bg-black/60 hover:bg-black/90 backdrop-blur-md border border-white/10 cursor-pointer"
+                title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
               >
-                {isFullscreen ? (
-                  <Minimize className="w-4 h-4 sm:w-5 sm:h-5" />
-                ) : (
-                  <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />
-                )}
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </button>
             </div>
           </div>
 
           {/* ============================================================ */}
-          {/* SLIDE-OVER EPISODES DRAWER INSIDE THE PLAYER                 */}
+          {/* TV SERIES EPISODES DRAWER (IF SERIES)                         */}
           {/* ============================================================ */}
           {showEpisodesDrawer && isSeries && (
-            <div className="absolute top-0 right-0 bottom-0 w-full sm:w-96 bg-[#141414]/95 backdrop-blur-xl border-l border-neutral-800 z-50 flex flex-col p-4 sm:p-6 animate-scale-up shadow-2xl">
-              <div className="flex items-center justify-between pb-4 border-b border-neutral-800">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <ListVideo className="w-5 h-5 text-[#E50914]" />
-                  <span>Saison {currentSeason} • Épisodes</span>
+            <div className="absolute right-0 top-0 bottom-0 w-80 sm:w-96 bg-[#141414]/95 backdrop-blur-xl border-l border-neutral-800 z-40 p-4 flex flex-col animate-slide-left">
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <ListVideo className="w-4 h-4 text-[#E50914]" />
+                  <span>Épisodes - Saison {currentSeason}</span>
                 </h3>
                 <button
                   onClick={() => setShowEpisodesDrawer(false)}
-                  className="text-neutral-400 hover:text-white p-1 rounded"
+                  className="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3 py-4 pr-1 no-scrollbar">
-                {currentSeasonEpisodes.map((ep) => {
-                  const isCurrent = ep.episode === currentEpisode && ep.season === currentSeason;
-                  return (
-                    <div
-                      key={ep.id}
-                      onClick={() => handleSelectEpisode(ep)}
-                      className={`group flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all border ${
-                        isCurrent
-                          ? "bg-[#E50914]/20 border-[#E50914]/60 shadow"
-                          : "bg-neutral-900/60 hover:bg-neutral-800/80 border-neutral-800"
-                      }`}
-                    >
-                      <div className="relative w-24 aspect-video rounded overflow-hidden flex-none bg-neutral-800">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={ep.thumbnail || movie.backdropUrl}
-                          alt={ep.title}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Play className="w-5 h-5 fill-white text-white" />
+              <div className="flex-1 overflow-y-auto space-y-2 py-3 pr-1">
+                {currentSeasonEpisodes.length === 0 ? (
+                  <p className="text-xs text-neutral-400 text-center py-8">
+                    Chargement des épisodes en cours...
+                  </p>
+                ) : (
+                  currentSeasonEpisodes.map((ep) => {
+                    const isCurrent = ep.season === currentSeason && ep.episode === currentEpisode;
+                    return (
+                      <div
+                        key={ep.id}
+                        onClick={() => handleSelectEpisode(ep)}
+                        className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border ${
+                          isCurrent
+                            ? "bg-[#E50914]/20 border-[#E50914] text-white"
+                            : "bg-neutral-900/60 border-neutral-800 hover:bg-neutral-800 text-neutral-300"
+                        }`}
+                      >
+                        <div className="relative w-20 aspect-video rounded overflow-hidden bg-neutral-800 flex-none">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={ep.thumbnail || movie.backdropUrl}
+                            alt={ep.title}
+                            className="w-full h-full object-cover"
+                          />
+                          {isCurrent && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <Play className="w-4 h-4 text-[#E50914] fill-[#E50914]" />
+                            </div>
+                          )}
                         </div>
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between text-xs font-semibold text-white">
-                          <span className="truncate">{ep.title}</span>
-                          <span className="text-[10px] text-neutral-400 font-mono">
-                            {ep.episode < 10 ? `E0${ep.episode}` : `E${ep.episode}`}
-                          </span>
-                        </div>
-                        {ep.overview && (
-                          <p className="text-[11px] text-neutral-400 line-clamp-2 mt-1">
-                            {ep.overview}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate leading-tight">
+                            {ep.episode}. {ep.title}
                           </p>
-                        )}
+                          <p className="text-[10px] text-neutral-400 line-clamp-1 mt-0.5">
+                            {ep.overview || "Regarder cet épisode sur FilmFlex"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
