@@ -62,8 +62,9 @@ export default function Navbar({
     { id: "home", label: "Home" },
     { id: "series", label: "TV Shows" },
     { id: "movies", label: "Movies" },
-    { id: "anime", label: "Anime 🎌" },
+    { id: "turkish", label: "Turc 🇹🇷" },
     { id: "tunisien", label: "Tunisien 🇹🇳" },
+    { id: "anime", label: "Anime 🎌" },
     { id: "popular", label: "New & Popular" },
     { id: "mylist", label: "My List" },
   ];

@@ -25,6 +25,7 @@ import {
   DEFAULT_PROFILES,
   TUNISIAN_MOVIES,
   ANIME_MOVIES,
+  TURKISH_MOVIES,
 } from "@/lib/constants";
 import {
   getStoredUser,
@@ -82,6 +83,7 @@ export default function HomePage() {
   const [seriesMovies, setSeriesMovies] = useState<Movie[]>(INITIAL_SERIES);
   const [tunisianMovies] = useState<Movie[]>(TUNISIAN_MOVIES);
   const [animeMovies] = useState<Movie[]>(ANIME_MOVIES);
+  const [turkishMovies] = useState<Movie[]>(TURKISH_MOVIES);
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
@@ -389,6 +391,7 @@ export default function HomePage() {
   const uniqueMoviesMap = new Map<string, Movie>();
   for (const m of [
     ...tunisianMovies,
+    ...turkishMovies,
     ...animeMovies,
     ...liveMovies,
     ...actionMovies,
@@ -626,6 +629,22 @@ export default function HomePage() {
             />
           )}
 
+          {/* DEDICATED TURKISH SERIES & MOVIES FULL PAGE CATALOG */}
+          {activeTab === "turkish" && (
+            <CategoryGridView
+              title="Séries & Cinéma Turcs 🇹🇷"
+              badge="المسلسلات والأفلام التركية"
+              description="Les plus grandes séries dramatiques, historiques et romantiques d'Istanbul : Kuruluş: Osman, Yalı Çapkını, Çukur, Diriliş: Ertuğrul et les chefs-d'œuvre du cinéma turc en 4K UHD avec sous-titres arabes et français."
+              movies={turkishMovies}
+              filterGenres={["Romance", "Action", "Drame", "Histoire", "Crime"]}
+              progressList={progressList}
+              myListIds={myListIds}
+              onPlay={(m) => handlePlayMovie(m)}
+              onToggleMyList={handleToggleMyList}
+              onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+            />
+          )}
+
           {/* DEDICATED TUNISIAN CINEMA FULL PAGE CATALOG */}
           {activeTab === "tunisien" && (
             <CategoryGridView
@@ -645,7 +664,7 @@ export default function HomePage() {
           {/* DEDICATED DOWNLOADS TAB (Stremio & Netflix exact match) */}
           {activeTab === "downloads" && (
             <DownloadsView
-              movies={[...liveMovies, ...animeMovies, ...tunisianMovies]}
+              movies={[...liveMovies, ...turkishMovies, ...animeMovies, ...tunisianMovies]}
               onPlay={(m) => handlePlayMovie(m)}
               onOpenModal={(movie) => setSelectedMovieForModal(movie)}
             />
@@ -745,6 +764,24 @@ export default function HomePage() {
                   onOpenModal={(movie) => setSelectedMovieForModal(movie)}
                   onViewAll={() => {
                     setActiveTab("anime");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                />
+              )}
+
+              {/* Row: Séries & Cinéma Turcs 🇹🇷 */}
+              {(activeTab === "home" || activeTab === "movies" || activeTab === "series") && (
+                <MovieRow
+                  title="Séries & Cinéma Turcs 🇹🇷 (المسلسلات والأفلام التركية)"
+                  movies={turkishMovies}
+                  filterGenres={["Romance", "Action", "Drame", "Histoire", "Crime"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  onViewAll={() => {
+                    setActiveTab("turkish");
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }}
                 />
