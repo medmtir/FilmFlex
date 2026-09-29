@@ -10,6 +10,7 @@ import ProfileGate from "@/components/ProfileGate";
 import PaywallModal from "@/components/PaywallModal";
 import AdminDashboard from "@/components/AdminDashboard";
 import AuthModal from "@/components/AuthModal";
+import FlixerSplash from "@/components/FlixerSplash";
 import ScreenLimitModal from "@/components/ScreenLimitModal";
 import FilmFlexLogo from "@/components/FilmFlexLogo";
 import CategoryGridView from "@/components/CategoryGridView";
@@ -485,6 +486,9 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-screen bg-[#0e0e12] text-white overflow-x-hidden selection:bg-[#E50914] selection:text-white">
+      {/* 0. Flixer Splash Intro (First Loading Screen) */}
+      <FlixerSplash />
+
       {/* 1. Header / Navbar */}
       <Navbar
         user={user}

@@ -434,6 +434,9 @@ export default function VideoPlayer({
 
     // 2. Ares: VidLink Pro 4K (Zero-Ads 4K Engine)
     if (srv === "ares") {
+      if (isSeries && streamTargetId.startsWith("tt")) {
+        return `https://vidsrc.sh/embed/tv?imdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`;
+      }
       return isSeries
         ? `https://vidlink.pro/tv/${streamTargetId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
         : `https://vidlink.pro/movie/${streamTargetId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
@@ -441,16 +444,26 @@ export default function VideoPlayer({
 
     // 3. Balder: AutoEmbed Multi-Source 4K
     if (srv === "balder") {
+      const isImdb = streamTargetId.startsWith("tt");
       return isSeries
-        ? `https://autoembed.co/tv/tmdb/${streamTargetId}-${currentSeason}-${currentEpisode}`
-        : `https://autoembed.co/movie/tmdb/${streamTargetId}`;
+        ? (isImdb
+            ? `https://autoembed.co/tv/imdb/${streamTargetId}-${currentSeason}-${currentEpisode}`
+            : `https://autoembed.co/tv/tmdb/${streamTargetId}-${currentSeason}-${currentEpisode}`)
+        : (isImdb
+            ? `https://autoembed.co/movie/imdb/${streamTargetId}`
+            : `https://autoembed.co/movie/tmdb/${streamTargetId}`);
     }
 
     // 4. Circe: Vidsrc VIP 4K (Ultra Fast Cloud - Zero Frame Blocking)
     if (srv === "circe") {
+      const isImdb = streamTargetId.startsWith("tt");
       return isSeries
-        ? `https://vidsrc.sh/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://vidsrc.sh/embed/movie?tmdb=${streamTargetId}`;
+        ? (isImdb
+            ? `https://vidsrc.sh/embed/tv?imdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
+            : `https://vidsrc.sh/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`)
+        : (isImdb
+            ? `https://vidsrc.sh/embed/movie?imdb=${streamTargetId}`
+            : `https://vidsrc.sh/embed/movie?tmdb=${streamTargetId}`);
     }
 
     // 5. Dionysus: MultiEmbed Fast CDN
@@ -620,6 +633,7 @@ export default function VideoPlayer({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
               referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
             />
           )}
 
@@ -674,25 +688,15 @@ export default function VideoPlayer({
               showControls ? "opacity-100" : "opacity-0"
             }`}
           >
-            {/* Left: Back button + Movie Title */}
-            <div className="flex items-center gap-3 pointer-events-auto">
+            {/* Left: Just the sleek round back button (no overlapping title on iframe) */}
+            <div className="flex items-center pointer-events-auto">
               <button
                 onClick={onBack}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/70 hover:bg-black text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/20 hover:scale-110 active:scale-95 shadow-2xl cursor-pointer"
                 title="Retour au catalogue"
               >
                 <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
               </button>
-              <div className="flex flex-col">
-                <span className="text-sm sm:text-base font-bold text-white drop-shadow truncate max-w-[200px] sm:max-w-md">
-                  {movie.title}
-                </span>
-                {isSeries && (
-                  <span className="text-[11px] sm:text-xs text-neutral-300 font-mono">
-                    S{currentSeason} • Épisode {currentEpisode}
-                  </span>
-                )}
-              </div>
             </div>
 
             {/* Right: Quick actions (Episodes + Server Switcher + Fullscreen) */}
