@@ -35,7 +35,6 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false, // Prevents exposing Next.js version header (Security Best Practice)
   compress: true, // Enable gzip compression (78% file size reduction like flixer.gd)
-  swcMinify: true, // Use SWC for faster minification
   images: {
     remotePatterns: [
       {
@@ -90,19 +89,6 @@ const nextConfig: NextConfig = {
           {
             key: "CDN-Cache-Control",
             value: "public, max-age=60, s-maxage=60, stale-while-revalidate=30",
-          },
-        ],
-      },
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
-          {
-            key: "CDN-Cache-Control",
-            value: "public, max-age=31536000, immutable",
           },
         ],
       },
