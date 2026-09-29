@@ -633,7 +633,6 @@ export default function VideoPlayer({
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
               referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation"
             />
           )}
 
@@ -703,22 +702,38 @@ export default function VideoPlayer({
             <div className="flex items-center gap-2 sm:gap-2.5 pointer-events-auto">
               {/* Episodes Drawer Toggle (Series only) */}
               {isSeries && (
-                <button
-                  onClick={() => {
-                    const next = !showEpisodesDrawer;
-                    closeAllModals();
-                    setShowEpisodesDrawer(next);
-                  }}
-                  className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md border transition-all cursor-pointer ${
-                    showEpisodesDrawer
-                      ? "bg-[#E50914] text-white border-[#E50914]"
-                      : "bg-black/60 hover:bg-black/80 text-white border-white/15"
-                  }`}
-                  title="Liste des épisodes"
-                >
-                  <Layers className="w-4 h-4 stroke-[2.2]" />
-                  <span className="hidden sm:inline">Épisodes</span>
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      const next = !showEpisodesDrawer;
+                      closeAllModals();
+                      setShowEpisodesDrawer(next);
+                    }}
+                    className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md border transition-all cursor-pointer ${
+                      showEpisodesDrawer
+                        ? "bg-[#E50914] text-white border-[#E50914]"
+                        : "bg-black/60 hover:bg-black/80 text-white border-white/15"
+                    }`}
+                    title="Liste des épisodes"
+                  >
+                    <Layers className="w-4 h-4 stroke-[2.2]" />
+                    <span className="hidden sm:inline">Épisodes</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const nextEp = currentEpisode + 1;
+                      setCurrentEpisode(nextEp);
+                      setResumedNotice(`Passage à l'épisode ${nextEp}`);
+                      setTimeout(() => setResumedNotice(null), 3000);
+                    }}
+                    className="px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md border bg-black/60 hover:bg-black/80 text-white border-white/15 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    title="Épisode suivant"
+                  >
+                    <FastForward className="w-4 h-4 stroke-[2.2]" />
+                    <span className="hidden sm:inline">Ép. {currentEpisode + 1}</span>
+                  </button>
+                </>
               )}
 
               {/* Server Switcher Pill */}

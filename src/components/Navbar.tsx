@@ -15,8 +15,10 @@ import {
   X,
   Smartphone,
   Settings,
+  Globe,
 } from "lucide-react";
 import FilmFlexLogo from "./FilmFlexLogo";
+import NotificationsDrawer from "./NotificationsDrawer";
 import { Profile, UserAccount } from "@/types";
 import { getRemainingDays } from "@/lib/auth";
 
@@ -32,6 +34,7 @@ interface NavbarProps {
   onSearchChange: (query: string) => void;
   activeTab: string;
   onTabChange: (tab: string) => void;
+  onSelectMovie?: (movieId: string) => void;
 }
 
 export default function Navbar({
@@ -46,27 +49,44 @@ export default function Navbar({
   onSearchChange,
   activeTab,
   onTabChange,
+  onSelectMovie,
 }: NavbarProps) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  const [currentLang, setCurrentLang] = useState<"fr" | "ar" | "en">("fr");
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
     window.addEventListener("scroll", handleScroll);
+
+    const saved = localStorage.getItem("filmflex_lang");
+    if (saved === "ar" || saved === "en" || saved === "fr") {
+      setCurrentLang(saved);
+    }
+
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  const changeLanguage = (lang: "fr" | "ar" | "en") => {
+    setCurrentLang(lang);
+    localStorage.setItem("filmflex_lang", lang);
+    setIsLangMenuOpen(false);
+    window.dispatchEvent(new Event("filmflex_lang_changed"));
+  };
+
   const navLinks = [
-    { id: "home", label: "Home" },
-    { id: "movies", label: "Movies" },
-    { id: "series", label: "TV Shows" },
-    { id: "mylist", label: "My List" },
-    { id: "turkish", label: "Turc 🇹🇷" },
-    { id: "tunisien", label: "Tunisien 🇹🇳" },
-    { id: "anime", label: "Anime 🎌" },
+    { id: "home", label: currentLang === "ar" ? "الرئيسية" : currentLang === "en" ? "Home" : "Accueil" },
+    { id: "movies", label: currentLang === "ar" ? "الأفلام" : currentLang === "en" ? "Movies" : "Films" },
+    { id: "series", label: currentLang === "ar" ? "المسلسلات" : currentLang === "en" ? "TV Shows" : "Séries" },
+    { id: "mylist", label: currentLang === "ar" ? "قائمتي" : currentLang === "en" ? "My List" : "Ma Liste" },
+    { id: "turkish", label: currentLang === "ar" ? "تركي 🇹🇷" : "Turc 🇹🇷" },
+    { id: "tunisien", label: currentLang === "ar" ? "تونسي 🇹🇳" : "Tunisien 🇹🇳" },
+    { id: "anime", label: currentLang === "ar" ? "أنمي 🎌" : "Anime 🎌" },
   ];
 
   const remaining = user?.subscriptionExpiresAt
@@ -147,7 +167,7 @@ export default function Navbar({
 
           {/* 2. Notification Bell with Tiny Red Dot matching Flixer */}
           <button
-            onClick={() => onOpenPaywall()}
+            onClick={() => setIsNotificationsOpen(true)}
             className="relative text-neutral-300 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
             title="Notifications"
             aria-label="Notifications"
@@ -155,6 +175,54 @@ export default function Navbar({
             <Bell className="w-5 h-5 stroke-[2]" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#E50914]" />
           </button>
+
+          {/* 3. Language Selector (FR / AR / EN) */}
+          <div className="relative">
+            <button
+              onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
+              className="flex items-center gap-1 text-neutral-300 hover:text-white px-2.5 py-1 rounded-full hover:bg-white/10 text-xs font-bold transition-colors cursor-pointer border border-neutral-700/60"
+              title="Changer de langue / Change language / تغيير اللغة"
+            >
+              <Globe className="w-3.5 h-3.5 text-[#E50914]" />
+              <span className="uppercase text-[11px]">{currentLang}</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${isLangMenuOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {isLangMenuOpen && (
+              <div
+                onMouseLeave={() => setIsLangMenuOpen(false)}
+                className="absolute right-0 top-9 w-36 bg-[#18181b]/98 backdrop-blur-2xl border border-neutral-800 rounded-xl shadow-2xl py-1.5 z-50 animate-scale-up text-xs"
+              >
+                <button
+                  onClick={() => changeLanguage("fr")}
+                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-neutral-800 transition-colors cursor-pointer ${
+                    currentLang === "fr" ? "text-[#E50914] font-bold" : "text-neutral-300"
+                  }`}
+                >
+                  <span>🇫🇷 Français</span>
+                  {currentLang === "fr" && <span className="w-1.5 h-1.5 rounded-full bg-[#E50914]" />}
+                </button>
+                <button
+                  onClick={() => changeLanguage("ar")}
+                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-neutral-800 transition-colors cursor-pointer ${
+                    currentLang === "ar" ? "text-[#E50914] font-bold" : "text-neutral-300"
+                  }`}
+                >
+                  <span>🇹🇳 العربية</span>
+                  {currentLang === "ar" && <span className="w-1.5 h-1.5 rounded-full bg-[#E50914]" />}
+                </button>
+                <button
+                  onClick={() => changeLanguage("en")}
+                  className={`w-full px-3 py-1.5 text-left flex items-center justify-between hover:bg-neutral-800 transition-colors cursor-pointer ${
+                    currentLang === "en" ? "text-[#E50914] font-bold" : "text-neutral-300"
+                  }`}
+                >
+                  <span>🇺🇸 English</span>
+                  {currentLang === "en" && <span className="w-1.5 h-1.5 rounded-full bg-[#E50914]" />}
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* 3. Settings Gear */}
           <button
@@ -235,19 +303,15 @@ export default function Navbar({
                   </div>
 
                   <div className="py-1">
-                    {/* Admin Dashboard Option */}
-                    {user.role === "admin" && (
-                      <button
-                        onClick={() => {
-                          setIsProfileMenuOpen(false);
-                          onOpenAdminDashboard();
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-xs text-red-300 hover:text-white hover:bg-red-950/40 flex items-center gap-2.5 transition-colors font-semibold cursor-pointer"
-                      >
-                        <ShieldCheck className="w-4 h-4 text-[#E50914]" />
-                        <span>Gestion des Abonnés (Admin)</span>
-                      </button>
-                    )}
+                    {/* Admin Dashboard Page Link */}
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                      className="w-full px-4 py-2.5 text-left text-xs text-red-300 hover:text-white hover:bg-red-950/40 flex items-center gap-2.5 transition-colors font-semibold cursor-pointer"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-[#E50914]" />
+                      <span>Netflix Studio Admin (/admin)</span>
+                    </Link>
 
                     <button
                       onClick={() => {
@@ -326,6 +390,14 @@ export default function Navbar({
           </button>
         ))}
       </div>
+
+      {/* Interactive Notifications Drawer */}
+      <NotificationsDrawer
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onOpenPaymentModal={onOpenPaywall}
+        onSelectMovie={onSelectMovie}
+      />
     </header>
   );
 }

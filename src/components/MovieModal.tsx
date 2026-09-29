@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download, Loader2 } from "lucide-react";
+import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download, Loader2, Film } from "lucide-react";
 import { Movie, Episode } from "@/types";
 import { startDownload, isItemDownloaded, isItemDownloading, onDownloadsUpdated } from "@/lib/downloadManager";
 
@@ -22,7 +22,7 @@ export default function MovieModal({
   onToggleMyList,
   allMovies,
 }: MovieModalProps) {
-  const [showTrailer, setShowTrailer] = useState(true);
+  const [showTrailer, setShowTrailer] = useState(false);
   const [isTrailerMuted, setIsTrailerMuted] = useState(false);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
@@ -132,17 +132,24 @@ export default function MovieModal({
               <iframe
                 src={`https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
                   isTrailerMuted ? 1 : 0
-                }&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`}
+                }&controls=1&modestbranding=1&rel=0&playsinline=1`}
                 title={movie.title}
                 className="w-full h-full object-cover"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 referrerPolicy="strict-origin-when-cross-origin"
               />
+              <button
+                onClick={() => setShowTrailer(false)}
+                className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Retour à l&apos;affiche</span>
+              </button>
             </div>
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={movie.backdropUrl}
+              src={movie.backdropUrl || movie.posterUrl}
               alt={movie.title}
               className="w-full h-full object-cover"
             />
@@ -199,6 +206,17 @@ export default function MovieModal({
                 >
                   <Download className="w-4 h-4" />
                 </button>
+
+                {movie.trailerYoutubeId && (
+                  <button
+                    onClick={() => setShowTrailer(!showTrailer)}
+                    className="px-3.5 py-2 rounded-full border border-neutral-400 hover:border-white bg-black/60 text-white flex items-center gap-1.5 text-xs font-semibold hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-lg"
+                    title={showTrailer ? "Voir l'affiche" : "Regarder la bande-annonce"}
+                  >
+                    <Film className="w-4 h-4 text-[#E50914]" />
+                    <span>{showTrailer ? "Affiche" : "Bande-annonce"}</span>
+                  </button>
+                )}
 
                 <button
                   onClick={handleShare}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import Billboard from "@/components/Billboard";
 import MovieRow from "@/components/MovieRow";
@@ -87,6 +87,31 @@ export default function HomePage() {
   const [turkishMovies] = useState<Movie[]>(TURKISH_MOVIES);
   const [searchResults, setSearchResults] = useState<Movie[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [selectedMovieGenre, setSelectedMovieGenre] = useState<string>("Tous");
+
+  const allMoviesPool = useMemo(() => {
+    return [
+      ...liveMovies,
+      ...tunisianMovies.filter((t) => t.type === "movie"),
+      ...turkishMovies.filter((t) => t.type === "movie"),
+      ...animeMovies.filter((a) => a.type === "movie"),
+    ];
+  }, [liveMovies, tunisianMovies, turkishMovies, animeMovies]);
+
+  const recommendedMovies = useMemo(() => {
+    return [...allMoviesPool]
+      .sort((a, b) => (b.matchPercentage || 95) - (a.matchPercentage || 95))
+      .slice(0, 12);
+  }, [allMoviesPool]);
+
+  const filteredCategoryMovies = useMemo(() => {
+    if (selectedMovieGenre === "Tous") return allMoviesPool;
+    if (selectedMovieGenre === "Cinéma Tunisien 🇹🇳") return tunisianMovies;
+    if (selectedMovieGenre === "Cinéma Turc 🇹🇷") return turkishMovies;
+    return allMoviesPool.filter((m) =>
+      m.genres.some((g) => g.toLowerCase().includes(selectedMovieGenre.toLowerCase()))
+    );
+  }, [allMoviesPool, selectedMovieGenre, tunisianMovies, turkishMovies]);
 
   // Initialize from LocalStorage (if logged in, load profile; if not, stay in Guest Mode)
   useEffect(() => {
@@ -505,6 +530,12 @@ export default function HomePage() {
           setActiveTab(tab);
           setSearchQuery("");
         }}
+        onSelectMovie={(movieId) => {
+          const target = [...liveMovies, ...turkishMovies, ...tunisianMovies, ...animeMovies].find(
+            (m) => m.id === movieId || m.imdbId === movieId
+          );
+          if (target) setSelectedMovieForModal(target);
+        }}
       />
 
       {/* 2. Hero Billboard Showcase (Rounded Card matching Image 2) */}
@@ -720,8 +751,119 @@ export default function HomePage() {
             </>
           )}
 
-          {/* HOME / MOVIES / POPULAR TAB */}
-          {["home", "movies", "popular"].includes(activeTab) && (
+          {/* DEDICATED MOVIES TAB WITH GLOBAL CATEGORIES & SMART RECOMMENDATIONS */}
+          {activeTab === "movies" && (
+            <div className="space-y-6">
+              {/* Global Category Filter Pills Bar on Top */}
+              <div className="px-4 md:px-8 max-w-7xl mx-auto">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-2">
+                  {[
+                    "Tous",
+                    "Action",
+                    "Comédie",
+                    "Drame",
+                    "Science-Fiction",
+                    "Thriller",
+                    "Romance",
+                    "Cinéma Tunisien 🇹🇳",
+                    "Cinéma Turc 🇹🇷",
+                  ].map((genre) => (
+                    <button
+                      key={genre}
+                      onClick={() => setSelectedMovieGenre(genre)}
+                      className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                        selectedMovieGenre === genre
+                          ? "bg-[#E50914] text-white shadow-lg shadow-[#E50914]/30 scale-105"
+                          : "bg-[#1f1f23] text-neutral-300 hover:text-white hover:bg-neutral-800 border border-neutral-800"
+                      }`}
+                    >
+                      {genre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top: Smart AI Recommendations Row */}
+              {selectedMovieGenre === "Tous" && (
+                <MovieRow
+                  title="⭐ Recommandé pour vous (Suggestions Intelligentes)"
+                  movies={recommendedMovies}
+                  filterGenres={["Action", "Drame", "Sci-Fi", "Comédie"]}
+                  progressList={progressList}
+                  myListIds={myListIds}
+                  onPlay={(m) => handlePlayMovie(m)}
+                  onToggleMyList={handleToggleMyList}
+                  onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                />
+              )}
+
+              {/* Filtered Grid or Categorized Rows */}
+              {selectedMovieGenre !== "Tous" ? (
+                <div className="px-4 md:px-8 max-w-7xl mx-auto">
+                  <h3 className="text-lg font-bold text-white mb-4">
+                    Films : {selectedMovieGenre} ({filteredCategoryMovies.length} titres)
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                    {filteredCategoryMovies.map((movie) => (
+                      <div
+                        key={movie.id}
+                        onClick={() => setSelectedMovieForModal(movie)}
+                        className="group relative rounded-xl overflow-hidden bg-neutral-900 cursor-pointer aspect-[2/3] border border-neutral-800 hover:border-[#E50914] transition-all hover:scale-105 shadow-xl"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={movie.posterUrl || movie.backdropUrl}
+                          alt={movie.title}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                          <span className="text-xs font-bold text-white leading-tight">{movie.title}</span>
+                          <span className="text-[10px] text-neutral-400 mt-1">
+                            {movie.releaseYear} • {movie.quality}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <MovieRow
+                    title="Blockbusters & Films Populaires"
+                    movies={liveMovies.slice(0, 14)}
+                    filterGenres={["Action", "Sci-Fi", "Comedy", "Thriller"]}
+                    progressList={progressList}
+                    myListIds={myListIds}
+                    onPlay={(m) => handlePlayMovie(m)}
+                    onToggleMyList={handleToggleMyList}
+                    onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  />
+                  <MovieRow
+                    title="Cinéma Tunisien 🇹🇳"
+                    movies={tunisianMovies.filter((t) => t.type === "movie")}
+                    filterGenres={["Comédie", "Drame", "Horreur"]}
+                    progressList={progressList}
+                    myListIds={myListIds}
+                    onPlay={(m) => handlePlayMovie(m)}
+                    onToggleMyList={handleToggleMyList}
+                    onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  />
+                  <MovieRow
+                    title="Films Turcs & Drames Romantiques 🇹🇷"
+                    movies={turkishMovies.filter((t) => t.type === "movie")}
+                    progressList={progressList}
+                    myListIds={myListIds}
+                    onPlay={(m) => handlePlayMovie(m)}
+                    onToggleMyList={handleToggleMyList}
+                    onOpenModal={(movie) => setSelectedMovieForModal(movie)}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {/* HOME / POPULAR TAB */}
+          {["home", "popular"].includes(activeTab) && (
             <>
               {/* Row 1: Trending Now with Image 2 Filter Pills */}
               {(activeTab === "home" || activeTab === "popular") && (
