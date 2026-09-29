@@ -41,3 +41,43 @@ body {
 .animate-shake {
   animation: shake 0.4s ease-in-out;
 }
+
+/* Smooth scale animation for hover effects */
+@keyframes scale-up {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.05); }
+}
+
+.animate-scale-up {
+  animation: scale-up 0.3s ease-out;
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out;
+}
+
+/* Glow effect for active elements */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(229, 9, 20, 0.5); }
+  50% { box-shadow: 0 0 20px rgba(229, 9, 20, 0.8); }
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+/* Smooth border animation */
+@keyframes border-pulse {
+  0%, 100% { border-color: rgba(229, 9, 20, 0.4); }
+  50% { border-color: rgba(229, 9, 20, 0.8); }
+}
+
+.animate-border-pulse {
+  animation: border-pulse 2s ease-in-out infinite;
+}

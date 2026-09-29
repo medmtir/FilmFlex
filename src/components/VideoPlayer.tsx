@@ -302,9 +302,9 @@ export default function VideoPlayer({
     });
 
     const queue = [
+      { id: "circe" as FlixerServerId, code: "charlie", name: "Circe" }, // Start with Circe (fastest)
       { id: "ares" as FlixerServerId, code: "alpha", name: "Ares" },
       { id: "balder" as FlixerServerId, code: "bravo", name: "Balder" },
-      { id: "circe" as FlixerServerId, code: "charlie", name: "Circe" },
       { id: "dionysus" as FlixerServerId, code: "delta", name: "Dionysus" },
       { id: "eros" as FlixerServerId, code: "echo", name: "Eros" },
       { id: "freya" as FlixerServerId, code: "foxtrot", name: "Freya" },
@@ -334,7 +334,7 @@ export default function VideoPlayer({
       setScanningStatusText(`Fetching source from ${item.code}...`);
 
       // Instant scanning (0ms delay for flixer.gd speed)
-      const willFail = isAresFailing ? (index === 0 || index === 1) : false;
+      const willFail = isAresFailing ? (index === 1 || index === 2) : false;
 
       if (!willFail) {
         setServerStatuses((prev) => ({ ...prev, [item.id]: "available" }));

@@ -84,7 +84,7 @@ export default function MovieCard({
         {/* Card Base Container */}
         <div
           onClick={() => onOpenModal(movie)}
-          className={`relative z-10 rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800/80 hover:border-neutral-600/80 cursor-pointer transition-all duration-300 shadow-md group-hover:shadow-2xl group-hover:scale-[1.03] ${
+          className={`relative z-10 rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800/50 hover:border-[#E50914]/60 cursor-pointer transition-all duration-500 ease-out shadow-lg hover:shadow-[0_20px_40px_rgba(229,9,20,0.3)] hover:scale-[1.05] ${
             isPortrait
               ? "w-36 sm:w-44 md:w-52 aspect-[2/3]"
               : "w-48 sm:w-60 md:w-68 aspect-[16/9]"
@@ -96,7 +96,7 @@ export default function MovieCard({
             alt={movie.title}
             fill
             priority={false}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
           />
 
           {/* FilmFlex Original Mini Badge */}
@@ -153,7 +153,7 @@ export default function MovieCard({
       {/* ============================================================ */}
       {isHovered && (
         <div
-          className={`hidden md:block absolute ${hoverPositionClass} z-50 bg-[#18181b] rounded-2xl shadow-[0_25px_60px_rgba(0,0,0,0.95)] overflow-hidden border border-neutral-700/80 transition-all duration-300 ease-out animate-scale-up`}
+          className={`hidden md:block absolute ${hoverPositionClass} z-50 bg-[#18181b] rounded-2xl shadow-[0_30px_70px_rgba(229,9,20,0.4)] overflow-hidden border border-[#E50914]/40 transition-all duration-500 ease-out animate-scale-up backdrop-blur-xl`}
         >
           {/* Top Video Preview / Backdrop */}
           <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">

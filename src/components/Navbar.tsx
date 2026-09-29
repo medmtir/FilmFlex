@@ -75,10 +75,10 @@ export default function Navbar({
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-40 transition-colors duration-300 select-none ${
+      className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ease-out select-none ${
         isScrolled
-          ? "bg-[#0e0e12]/95 backdrop-blur-md shadow-lg border-b border-neutral-800/80"
-          : "bg-gradient-to-b from-black/90 via-black/50 to-transparent"
+          ? "bg-[#0e0e12]/98 backdrop-blur-xl shadow-2xl shadow-[#E50914]/10 border-b border-[#E50914]/20"
+          : "bg-gradient-to-b from-black/95 via-black/70 to-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 md:h-20 flex items-center justify-between gap-4">
@@ -86,20 +86,20 @@ export default function Navbar({
         <div className="flex items-center gap-6 lg:gap-8">
           <button
             onClick={() => onTabChange("home")}
-            className="focus:outline-none flex items-center shrink-0 cursor-pointer"
+            className="focus:outline-none flex items-center shrink-0 cursor-pointer hover:scale-105 transition-transform duration-300"
           >
             <FilmFlexLogo size="md" />
           </button>
 
-          <nav className="hidden lg:flex items-center gap-5 text-sm">
+          <nav className="hidden lg:flex items-center gap-6 text-sm">
             {navLinks.map((link) => (
               <button
                 key={link.id}
                 onClick={() => onTabChange(link.id)}
-                className={`transition-colors font-medium cursor-pointer ${
+                className={`transition-all duration-300 font-medium cursor-pointer relative group ${
                   activeTab === link.id
-                    ? "text-white font-bold"
-                    : "text-neutral-400 hover:text-white"
+                    ? "text-white font-bold after:content-[''] after:absolute after:-bottom-2 after:left-0 after:right-0 after:h-0.5 after:bg-[#E50914] after:shadow-[0_0_10px_#E50914]"
+                    : "text-neutral-400 hover:text-white hover:after:content-[''] hover:after:absolute hover:after:-bottom-2 hover:after:left-0 hover:after:right-0 hover:after:h-0.5 hover:after:bg-[#E50914]/50 hover:after:transition-all"
                 }`}
               >
                 {link.label}
@@ -111,7 +111,7 @@ export default function Navbar({
         {/* Right Section: Image 2 Pill Search, Notification Bell, User Avatar / Login */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {/* Sleek Pill Search Bar (Matching Image 2 with red round search button) */}
-          <div className="relative flex items-center bg-white/10 hover:bg-white/15 focus-within:bg-black/80 focus-within:border-white/40 border border-white/15 rounded-full pl-3.5 pr-1 py-1 transition-all">
+          <div className="relative flex items-center bg-white/10 hover:bg-white/20 focus-within:bg-black/90 focus-within:border-[#E50914]/60 border border-white/20 hover:border-[#E50914]/40 rounded-full pl-3.5 pr-1 py-1.5 transition-all duration-300 shadow-lg hover:shadow-[#E50914]/20">
             <input
               type="text"
               placeholder="Search..."
@@ -122,12 +122,12 @@ export default function Navbar({
             {searchQuery && (
               <button
                 onClick={() => onSearchChange("")}
-                className="p-1 text-neutral-400 hover:text-white mr-1"
+                className="p-1 text-neutral-400 hover:text-white mr-1 transition-colors"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
-            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#E50914] text-white flex items-center justify-center shrink-0 shadow-md">
+            <div className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#E50914] hover:bg-[#b80710] text-white flex items-center justify-center shrink-0 shadow-lg shadow-[#E50914]/30 transition-all duration-300 hover:scale-110">
               <Search className="w-3.5 h-3.5 md:w-4 md:h-4 text-white" />
             </div>
           </div>
@@ -136,18 +136,18 @@ export default function Navbar({
           {user?.role === "admin" && (
             <button
               onClick={onOpenAdminDashboard}
-              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-red-950/80 hover:bg-red-900 border border-red-600/70 text-red-300 transition-all shadow-lg hover:scale-105 cursor-pointer"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-[#E50914]/90 hover:bg-[#E50914] border border-[#E50914]/50 text-white transition-all shadow-lg shadow-[#E50914]/30 hover:scale-105 cursor-pointer"
               title="Ouvrir le tableau de bord Administrateur"
             >
-              <ShieldCheck className="w-4 h-4 text-[#E50914]" />
-              <span>Admin Dashboard</span>
+              <ShieldCheck className="w-4 h-4 text-white" />
+              <span>Admin</span>
             </button>
           )}
 
           {/* App Android Button */}
           <a
             href="/download"
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/15 text-neutral-200 hover:text-white transition-all shadow-md hover:scale-105 cursor-pointer"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 border border-white/20 text-neutral-200 hover:text-white transition-all shadow-lg hover:shadow-[#E50914]/20 hover:scale-105 cursor-pointer"
             title="Télécharger l'application Android FilmFlex (.apk)"
           >
             <Smartphone className="w-3.5 h-3.5 text-[#E50914]" />
@@ -157,7 +157,7 @@ export default function Navbar({
 
           {/* Notifications Bell */}
           <button
-            className="text-neutral-300 hover:text-white transition-colors p-1.5 hidden sm:block cursor-pointer"
+            className="text-neutral-300 hover:text-white hover:scale-110 transition-all duration-300 p-1.5 hidden sm:block cursor-pointer"
             aria-label="Notifications"
           >
             <Bell className="w-5 h-5" />
@@ -168,7 +168,7 @@ export default function Navbar({
             /* Guest Mode: Red Pill Connexion Button */
             <button
               onClick={onOpenAuthModal}
-              className="flex items-center gap-1.5 px-4 md:px-5 py-2 rounded-full text-xs md:text-sm font-bold bg-[#E50914] hover:bg-[#b80710] text-white transition-all shadow-md shadow-[#E50914]/40 hover:scale-105 active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-4 md:px-5 py-2 rounded-full text-xs md:text-sm font-bold bg-[#E50914] hover:bg-[#b80710] text-white transition-all shadow-lg shadow-[#E50914]/40 hover:shadow-[#E50914]/60 hover:scale-105 active:scale-95 cursor-pointer"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Connexion</span>
