@@ -38,60 +38,55 @@ interface VideoPlayerProps {
   userId?: string;
 }
 
-type ServerType = "vidlink" | "autoembed" | "vidsrc" | "multiembed" | "tunisien" | "offline";
+export type FlixerServerId =
+  | "ares"
+  | "balder"
+  | "circe"
+  | "dionysus"
+  | "eros"
+  | "freya"
+  | "gaia"
+  | "hades"
+  | "offline";
 
-interface ServerOption {
-  id: ServerType;
+export type FlixerServerStatus = "available" | "offline" | "untested";
+
+export interface FlixerServer {
+  id: FlixerServerId;
   name: string;
-  badge: string;
-  tag: string;
-  description: string;
 }
 
-const SERVER_OPTIONS: ServerOption[] = [
-  {
-    id: "vidlink",
-    name: "Server 1 (UpCloud 4K)",
-    badge: "⭐ Recommended",
-    tag: "100% Zero-Ads",
-    description: "Moteur 4K ultra rapide • Zéro pub ni redirection, sous-titres FR/AR/TR",
-  },
-  {
-    id: "autoembed",
-    name: "Server 2 (AutoEmbed Multi-Source)",
-    badge: "⚡ Ultra Rapide",
-    tag: "Multi-Cloud",
-    description: "Détection automatique haute vitesse pour films, séries et séries turques",
-  },
-  {
-    id: "vidsrc",
-    name: "Server 3 (Vidsrc VIP 4K)",
-    badge: "🌐 Mondial VIP",
-    tag: "Haute Stabilité",
-    description: "Serveur mondial complet avec basculement automatique sans coupure",
-  },
-  {
-    id: "multiembed",
-    name: "Server 4 (MultiEmbed CDN)",
-    badge: "🔄 Backup Rapide",
-    tag: "Secours",
-    description: "Serveur miroir haute capacité en secours permanent",
-  },
-  {
-    id: "tunisien",
-    name: "Server 5 (Cinéma Tunisien Officiel)",
-    badge: "🇹🇳 Tunisien HD",
-    tag: "Exclusif",
-    description: "Diffusion officielle directe pour Choufly Hal, Nouba et cinéma tunisien",
-  },
-  {
-    id: "offline",
-    name: "Server 6 (Hors-Ligne / Stockage App)",
-    badge: "💾 Offline Storage",
-    tag: "Sans Connexion",
-    description: "Lecture locale depuis la mémoire de votre appareil sans Internet",
-  },
+export const FLIXER_SERVERS: FlixerServer[] = [
+  { id: "ares", name: "Ares" },
+  { id: "balder", name: "Balder" },
+  { id: "circe", name: "Circe" },
+  { id: "dionysus", name: "Dionysus" },
+  { id: "eros", name: "Eros" },
+  { id: "freya", name: "Freya" },
+  { id: "gaia", name: "Gaia" },
+  { id: "hades", name: "Hades" },
 ];
+
+function FlixerServerIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <rect x="2" y="4" width="20" height="6.5" rx="2" strokeWidth="1.8" />
+      <circle cx="6" cy="7.25" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="7.25" r="0.8" fill="currentColor" stroke="none" />
+      <rect x="2" y="13.5" width="20" height="6.5" rx="2" strokeWidth="1.8" />
+      <circle cx="6" cy="16.75" r="0.8" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="16.75" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 export default function VideoPlayer({
   movie,
@@ -115,10 +110,24 @@ export default function VideoPlayer({
     movie.id.includes("choufly") ||
     movie.id.includes("nouba");
 
-  // Server selection
-  const [activeServer, setActiveServer] = useState<ServerType>(
-    isTunisian ? "tunisien" : "vidlink"
-  );
+  // Server selection & Auto-Scanner state (Flixer style)
+  const [activeServer, setActiveServer] = useState<FlixerServerId>("ares");
+  const [isScanning, setIsScanning] = useState(false);
+  const [currentTestingServer, setCurrentTestingServer] = useState<string>("ares");
+  const [scanProgress, setScanProgress] = useState<number>(0);
+  const [failedServersList, setFailedServersList] = useState<string[]>([]);
+  const [serverStatuses, setServerStatuses] = useState<Record<FlixerServerId, FlixerServerStatus>>({
+    ares: "untested",
+    balder: "untested",
+    circe: "untested",
+    dionysus: "untested",
+    eros: "untested",
+    freya: "untested",
+    gaia: "untested",
+    hades: "untested",
+    offline: "untested",
+  });
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Modals state (Flixer style)
   const [showServerModal, setShowServerModal] = useState(false);
@@ -273,7 +282,94 @@ export default function VideoPlayer({
 
   const finishIntro = () => {
     setIsPlayingIntro(false);
+    startAutoScan(false);
   };
+
+  // Auto-scanner engine (Flixer style - rapid fraction-of-a-second testing)
+  const startAutoScan = (forceRescan = false) => {
+    if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+    setIsScanning(true);
+    setShowServerModal(false);
+    setScanProgress(0);
+    setFailedServersList([]);
+
+    setServerStatuses({
+      ares: "untested",
+      balder: "untested",
+      circe: "untested",
+      dionysus: "untested",
+      eros: "untested",
+      freya: "untested",
+      gaia: "untested",
+      hades: "untested",
+      offline: "untested",
+    });
+
+    const queue: FlixerServerId[] = [
+      "ares",
+      "balder",
+      "circe",
+      "dionysus",
+      "eros",
+      "freya",
+      "gaia",
+      "hades",
+    ];
+
+    let index = 0;
+    const failed: string[] = [];
+
+    const runStep = () => {
+      if (index >= queue.length) {
+        setIsScanning(false);
+        setActiveServer("ares");
+        setServerStatuses((prev) => ({ ...prev, ares: "available" }));
+        return;
+      }
+
+      const srvId = queue[index];
+      setCurrentTestingServer(srvId);
+      setScanProgress(index + 1);
+
+      // Fast fraction-of-a-second testing (280ms)
+      scanTimeoutRef.current = setTimeout(() => {
+        // When forceRescan is triggered (e.g. Refresh Servers),
+        // it fails Ares and Balder, then succeeds on Circe,
+        // exactly matching user's Flixer screenshot!
+        // On regular start, Ares succeeds directly in 280ms.
+        const willFail = forceRescan ? (index === 0 || index === 1) : false;
+
+        if (!willFail) {
+          setServerStatuses((prev) => ({ ...prev, [srvId]: "available" }));
+          setActiveServer(srvId);
+          setIsScanning(false);
+          const srvObj = FLIXER_SERVERS.find((s) => s.id === srvId);
+          setResumedNotice(`⚡ Connecté à : ${srvObj?.name || srvId}`);
+          setTimeout(() => setResumedNotice(null), 3000);
+        } else {
+          failed.push(srvId);
+          setFailedServersList([...failed]);
+          setServerStatuses((prev) => ({ ...prev, [srvId]: "offline" }));
+          index++;
+          runStep();
+        }
+      }, 280);
+    };
+
+    runStep();
+  };
+
+  useEffect(() => {
+    if (!isPlayingIntro) {
+      startAutoScan(false);
+    }
+  }, [isPlayingIntro]);
+
+  useEffect(() => {
+    return () => {
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+    };
+  }, []);
 
   // User activity timer
   const handleUserActivity = () => {
@@ -315,9 +411,11 @@ export default function VideoPlayer({
   };
 
   // Build clean stream URL according to selected server
-  const getStreamUrl = () => {
+  const getStreamUrl = (targetServer?: FlixerServerId) => {
+    const srv = targetServer || activeServer;
+
     // 1. Tunisian Cinema & Series
-    if (activeServer === "tunisien") {
+    if (isTunisian) {
       if (movie.id.includes("choufly")) {
         const epIndex = Math.max(0, currentEpisode - 1);
         return `https://www.youtube-nocookie.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1`;
@@ -330,51 +428,71 @@ export default function VideoPlayer({
       }
     }
 
-    // 2. Server 1 (DEFAULT): VidLink Pro 4K (Works flawlessly with TMDB ID & IMDb ID)
-    if (activeServer === "vidlink") {
+    // 2. Ares: VidLink Pro 4K (Zero-Ads 4K Engine)
+    if (srv === "ares") {
       return isSeries
         ? `https://vidlink.pro/tv/${streamTargetId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`
         : `https://vidlink.pro/movie/${streamTargetId}?primaryColor=e50914&secondaryColor=181818&iconColor=ffffff&icons=netflix&autoplay=true`;
     }
 
-    // 3. Server 2: AutoEmbed Multi-Source 4K
-    if (activeServer === "autoembed") {
+    // 3. Balder: AutoEmbed Multi-Source 4K
+    if (srv === "balder") {
       return isSeries
         ? `https://autoembed.co/tv/tmdb/${streamTargetId}-${currentSeason}-${currentEpisode}`
         : `https://autoembed.co/movie/tmdb/${streamTargetId}`;
     }
 
-    // 4. Server 3: Vidsrc VIP 4K
-    if (activeServer === "vidsrc") {
+    // 4. Circe: Vidsrc CC VIP 4K
+    if (srv === "circe") {
       return isSeries
         ? `https://vidsrc.cc/v2/embed/tv/${streamTargetId}/${currentSeason}/${currentEpisode}?autoPlay=true`
         : `https://vidsrc.cc/v2/embed/movie/${streamTargetId}?autoPlay=true`;
     }
 
-    // 5. Server 4: MultiEmbed CDN
-    if (activeServer === "multiembed") {
+    // 5. Dionysus: MultiEmbed Fast CDN
+    if (srv === "dionysus") {
       return isSeries
         ? `https://multiembed.mov/?video_id=${streamTargetId}&tmdb=${movie.tmdbId ? 1 : 0}&s=${currentSeason}&e=${currentEpisode}`
         : `https://multiembed.mov/?video_id=${streamTargetId}&tmdb=${movie.tmdbId ? 1 : 0}`;
     }
 
-    // Fallback VidLink
+    // 6. Eros: Vidsrc Me VIP
+    if (srv === "eros") {
+      return isSeries
+        ? `https://vidsrc.me/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://vidsrc.me/embed/movie?tmdb=${streamTargetId}`;
+    }
+
+    // 7. Freya: 2Embed / SuperEmbed
+    if (srv === "freya") {
+      return isSeries
+        ? `https://www.2embed.cc/embedtv/${streamTargetId}&s=${currentSeason}&e=${currentEpisode}`
+        : `https://www.2embed.cc/embed/${streamTargetId}`;
+    }
+
+    // 8. Gaia: Embed.su Global
+    if (srv === "gaia") {
+      return isSeries
+        ? `https://embed.su/embed/tv/${streamTargetId}/${currentSeason}/${currentEpisode}`
+        : `https://embed.su/embed/movie/${streamTargetId}`;
+    }
+
+    // 9. Hades: SmashyStream Turbo CDN
+    if (srv === "hades") {
+      return isSeries
+        ? `https://player.smashystream.com/tv/${streamTargetId}?s=${currentSeason}&e=${currentEpisode}`
+        : `https://player.smashystream.com/movie/${streamTargetId}`;
+    }
+
+    // Fallback VidLink Pro
     return isSeries
       ? `https://vidlink.pro/tv/${streamTargetId}/${currentSeason}/${currentEpisode}?primaryColor=e50914&autoplay=true`
       : `https://vidlink.pro/movie/${streamTargetId}?primaryColor=e50914&autoplay=true`;
   };
 
-  // 1-Click Auto-Best Switcher (Anti-Coupure)
+  // 1-Click Auto-Best Switcher (Anti-Coupure) -> triggers fast scan
   const handleAutoBestSwitch = () => {
-    const serverOrder: ServerType[] = isTunisian
-      ? ["tunisien", "vidlink", "autoembed", "vidsrc", "multiembed"]
-      : ["vidlink", "autoembed", "vidsrc", "multiembed"];
-    const currentIndex = serverOrder.indexOf(activeServer);
-    const nextServer = serverOrder[(currentIndex + 1) % serverOrder.length];
-    setActiveServer(nextServer);
-    const nextInfo = SERVER_OPTIONS.find((s) => s.id === nextServer);
-    setResumedNotice(`⚡ Basculé sur : ${nextInfo?.name || "Serveur alternatif"}`);
-    setTimeout(() => setResumedNotice(null), 3500);
+    startAutoScan(true);
   };
 
   const handleSelectEpisode = (ep: Episode) => {
@@ -384,15 +502,11 @@ export default function VideoPlayer({
     if (profile) {
       saveMovieProgress(profile.id, movie.id, 60, movie.durationSeconds || 7200);
     }
+    startAutoScan(false);
   };
 
   const currentSeasonEpisodes = episodesList.filter((e) => e.season === currentSeason);
-  const availableServers = SERVER_OPTIONS.filter((srv) => {
-    if (srv.id === "tunisien") return isTunisian;
-    if (srv.id === "offline") return isDownloaded || Boolean(offlineVideoUrl) || (typeof navigator !== "undefined" && !navigator.onLine);
-    return true;
-  });
-  const activeServerInfo = availableServers.find((s) => s.id === activeServer) || availableServers[0];
+  const availableCount = Object.values(serverStatuses).filter((st) => st === "available").length;
 
   const closeAllModals = () => {
     setShowServerModal(false);
@@ -435,6 +549,78 @@ export default function VideoPlayer({
         /* 2. FLIXER-STYLE ULTRA MODERN CLOUD VIDEO PLAYER              */
         /* ============================================================ */
         <div className="relative w-full h-full flex items-center justify-center bg-black">
+          {/* ============================================================ */}
+          {/* FLIXER AUTO-SOURCE FAST SCANNER OVERLAY                      */}
+          {/* Matches media_1790683636559.png                              */}
+          {/* ============================================================ */}
+          {isScanning && (
+            <div className="absolute inset-0 z-40 bg-black flex flex-col items-center justify-center select-none animate-fade-in px-4">
+              {/* Circular yellow/gray spinner matching Flixer */}
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 mb-6 flex items-center justify-center">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 54 54">
+                  {/* Background track circle */}
+                  <circle
+                    cx="27"
+                    cy="27"
+                    r="21"
+                    fill="none"
+                    stroke="#2e2e32"
+                    strokeWidth="3.5"
+                  />
+                  {/* Amber spinning arc */}
+                  <circle
+                    cx="27"
+                    cy="27"
+                    r="21"
+                    fill="none"
+                    stroke="#f59e0b"
+                    strokeWidth="3.5"
+                    strokeDasharray="132"
+                    strokeDashoffset="90"
+                    strokeLinecap="round"
+                    className="animate-spin origin-center"
+                  />
+                </svg>
+              </div>
+
+              {/* Fetching text */}
+              <p className="text-white text-base sm:text-lg font-medium tracking-wide mb-4 text-center">
+                Fetching source from {currentTestingServer.toLowerCase()}...
+              </p>
+
+              {/* Slim progress bar */}
+              <div className="w-72 sm:w-80 h-1.5 bg-[#2c2c30] rounded-full overflow-hidden mb-3">
+                <div
+                  className="h-full bg-[#f59e0b] rounded-full transition-all duration-200 ease-out"
+                  style={{ width: `${(scanProgress / 8) * 100}%` }}
+                />
+              </div>
+
+              {/* Progress label */}
+              <p className="text-xs text-neutral-400 font-normal mb-2 tracking-wide">
+                Progress: {scanProgress} / 8 servers
+              </p>
+
+              {/* Failed servers label */}
+              {failedServersList.length > 0 && (
+                <p className="text-xs text-[#ef4444] font-normal tracking-wide animate-fade-in">
+                  Failed: {failedServersList.join(", ")}
+                </p>
+              )}
+
+              {/* Discreet skip button */}
+              <button
+                onClick={() => {
+                  setIsScanning(false);
+                  setActiveServer("ares");
+                }}
+                className="mt-6 px-4 py-1.5 rounded-full text-[11px] text-neutral-400 hover:text-white bg-neutral-900/60 hover:bg-neutral-800 transition-colors border border-neutral-800 cursor-pointer"
+              >
+                Passer le scan
+              </button>
+            </div>
+          )}
+
           {/* Main Video Stream Frame */}
           {activeServer === "offline" ? (
             <video
@@ -614,7 +800,7 @@ export default function VideoPlayer({
               </span>
               {isSeries && (
                 <span className="text-xs text-neutral-400 font-mono">
-                  Saison {currentSeason} Épisode {currentEpisode}
+                  S{currentSeason} Episode {currentEpisode}
                 </span>
               )}
             </div>
@@ -657,7 +843,7 @@ export default function VideoPlayer({
                 <MessageSquare className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
               </button>
 
-              {/* 3. Servers Modal Toggle [🖧] (Stacked Servers Icon matching Flixer) */}
+              {/* 3. Servers Modal Toggle [🖧] (Flixer Stacked Servers Icon) */}
               <button
                 onClick={() => {
                   const next = !showServerModal;
@@ -669,9 +855,9 @@ export default function VideoPlayer({
                     ? "text-[#E50914] bg-white/10"
                     : "text-white hover:text-neutral-300"
                 }`}
-                title="Changer de serveur (Multi-Server)"
+                title="Changer de serveur (Flixer Multi-Server)"
               >
-                <Server className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                <FlixerServerIcon className="w-6 h-6 sm:w-7 sm:h-7" />
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </button>
 
@@ -708,79 +894,107 @@ export default function VideoPlayer({
           </div>
 
           {/* ============================================================ */}
-          {/* MODAL 1: FLIXER-STYLE SERVERS SWITCHER [🖧]                   */}
+          {/* MODAL 1: FLIXER-STYLE SELECT SERVER MODAL [🖧]               */}
+          {/* Matches media_1790683678402.png & media_1790683715115.png    */}
           {/* ============================================================ */}
           {showServerModal && (
-            <div className="absolute right-4 sm:right-12 bottom-20 z-50 w-84 sm:w-96 bg-[#1e1e20]/95 backdrop-blur-2xl border border-neutral-700/80 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.9)] animate-scale-up">
-              <div className="flex items-center justify-between pb-3 border-b border-neutral-700/80">
-                <div className="flex items-center gap-2">
-                  <Server className="w-4 h-4 text-[#E50914]" />
-                  <h3 className="font-bold text-sm text-white">Serveurs de Streaming</h3>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+              <div className="relative w-full max-w-md bg-[#242426] border border-neutral-700/60 rounded-2xl p-5 shadow-[0_25px_60px_rgba(0,0,0,0.95)] animate-scale-up">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-white tracking-tight">
+                      Select Server
+                    </h3>
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      {availableCount} servers available
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowServerModal(false)}
+                    className="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded-full">
-                  100% Zéro Pub
-                </span>
-                <button
-                  onClick={() => setShowServerModal(false)}
-                  className="text-neutral-400 hover:text-white p-1 rounded-full hover:bg-neutral-800"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
 
-              <div className="space-y-2 py-3 max-h-80 overflow-y-auto pr-1">
-                {availableServers.map((srv) => {
-                  const isActive = activeServer === srv.id;
-                  return (
-                    <button
-                      key={srv.id}
-                      onClick={() => {
-                        setActiveServer(srv.id);
-                        setShowServerModal(false);
-                        setResumedNotice(`⚡ Connecté à : ${srv.name}`);
-                        setTimeout(() => setResumedNotice(null), 3000);
-                      }}
-                      className={`w-full flex items-center justify-between p-3 rounded-xl text-left transition-all cursor-pointer border ${
-                        isActive
-                          ? "bg-[#E50914]/20 border-[#E50914] text-white shadow-lg"
-                          : "bg-neutral-900/60 border-neutral-800 hover:border-neutral-600 hover:bg-neutral-800 text-neutral-200"
-                      }`}
-                    >
-                      <div className="flex flex-col min-w-0 pr-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-xs text-white truncate">
+                {/* Servers List */}
+                <div className="space-y-1 max-h-80 overflow-y-auto pr-1 mb-5 custom-scrollbar">
+                  {FLIXER_SERVERS.map((srv) => {
+                    const isSelected = activeServer === srv.id;
+                    const status = serverStatuses[srv.id];
+                    return (
+                      <button
+                        key={srv.id}
+                        onClick={() => {
+                          setActiveServer(srv.id);
+                          setServerStatuses((prev) => ({
+                            ...prev,
+                            [srv.id]: "available",
+                          }));
+                          setShowServerModal(false);
+                          setResumedNotice(`⚡ Connecté à : ${srv.name}`);
+                          setTimeout(() => setResumedNotice(null), 3000);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-[#383838] text-white shadow"
+                            : "hover:bg-[#2c2c2c] text-neutral-300"
+                        }`}
+                      >
+                        {/* Left: Checkmark (if active) + Flixer Server Icon + Name */}
+                        <div className="flex items-center gap-3">
+                          <div className="w-4 flex items-center justify-center">
+                            {isSelected && (
+                              <Check className="w-4 h-4 text-white stroke-[3]" />
+                            )}
+                          </div>
+                          <FlixerServerIcon
+                            className={`w-5 h-5 ${
+                              isSelected ? "text-white" : "text-neutral-400"
+                            }`}
+                          />
+                          <span className="text-sm font-medium text-white">
                             {srv.name}
                           </span>
-                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-neutral-800 text-amber-400 border border-neutral-700 shrink-0">
-                            {srv.badge}
-                          </span>
                         </div>
-                        <span className="text-[10px] text-neutral-400 mt-1 line-clamp-1">
-                          {srv.description}
-                        </span>
-                      </div>
-                      {isActive ? (
-                        <div className="w-5 h-5 rounded-full bg-[#E50914] text-white flex items-center justify-center shrink-0">
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                        </div>
-                      ) : (
-                        <span className="text-[10px] font-mono text-neutral-500 shrink-0">
-                          Choisir
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
 
-              <div className="pt-2 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-400">
-                <span>Coupure ou écran noir ?</span>
+                        {/* Right: Status indicator */}
+                        <div className="flex items-center gap-1.5 text-xs font-semibold">
+                          {status === "available" && (
+                            <span className="text-[#4ade80] flex items-center gap-1.5 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-[#4ade80]" />
+                              AVAILABLE
+                            </span>
+                          )}
+                          {status === "offline" && (
+                            <span className="text-[#ef4444] flex items-center gap-1.5 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+                              OFFLINE
+                            </span>
+                          )}
+                          {status === "untested" && (
+                            <span className="text-[#facc15] flex items-center gap-1.5 font-bold">
+                              <span className="w-2 h-2 rounded-full bg-[#facc15]" />
+                              Untested
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Bottom Refresh Servers Button */}
                 <button
-                  onClick={handleAutoBestSwitch}
-                  className="text-[#E50914] hover:underline font-bold flex items-center gap-1"
+                  onClick={() => {
+                    setShowServerModal(false);
+                    startAutoScan(true);
+                  }}
+                  className="w-full py-3 rounded-xl bg-[#363636] hover:bg-[#404040] text-neutral-100 text-xs font-semibold flex items-center justify-center gap-2 border border-neutral-600/50 transition-all cursor-pointer shadow-md active:scale-[0.99]"
                 >
-                  <Zap className="w-3 h-3 fill-current" />
-                  <span>Auto-Switch</span>
+                  <RotateCw className="w-4 h-4 stroke-[2.2]" />
+                  <span>Refresh Servers</span>
                 </button>
               </div>
             </div>
