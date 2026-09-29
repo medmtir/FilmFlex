@@ -418,14 +418,18 @@ export default function VideoPlayer({
     if (isTunisian) {
       if (movie.id.includes("choufly")) {
         const epIndex = Math.max(0, currentEpisode - 1);
-        return `https://www.youtube-nocookie.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1`;
+        return `https://www.youtube.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1&rel=0&modestbranding=1`;
       }
       if (movie.trailerYoutubeId) {
-        return `https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&rel=0`;
+        return `https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
       }
       if (movie.videoUrl && movie.videoUrl !== "/sample.mp4") {
         return movie.videoUrl;
       }
+      // Fallback to Circe for Tunisian movies if no YouTube source
+      return isSeries
+        ? `https://vidsrc.sh/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://vidsrc.sh/embed/movie?tmdb=${streamTargetId}`;
     }
 
     // 2. Ares: VidLink Pro 4K (Zero-Ads 4K Engine)
@@ -663,48 +667,37 @@ export default function VideoPlayer({
           )}
 
           {/* ============================================================ */}
-          {/* TOP LEFT: SLEEK BACK ARROW (MATCHING FLIXER)                 */}
+          {/* TOP BAR: CLEAN FLIXER & NETFLIX STYLE CONTROLS               */}
           {/* ============================================================ */}
           <div
-            className={`absolute top-0 left-0 p-4 sm:p-6 z-40 transition-opacity duration-300 pointer-events-none ${
+            className={`absolute top-0 left-0 right-0 p-4 sm:p-6 z-40 transition-opacity duration-300 pointer-events-none flex items-center justify-between bg-gradient-to-b from-black/80 via-black/40 to-transparent ${
               showControls ? "opacity-100" : "opacity-0"
             }`}
           >
-            <button
-              onClick={onBack}
-              className="pointer-events-auto w-11 h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
-              title="Retour au catalogue"
-            >
-              <ArrowLeft className="w-6 h-6 stroke-[2.5]" />
-            </button>
-          </div>
-
-          {/* ============================================================ */}
-          {/* BOTTOM CONTROLS BAR: 100% FLIXER STYLE                       */}
-          {/* ============================================================ */}
-          <div
-            className={`absolute bottom-0 left-0 right-0 px-4 sm:px-8 py-5 bg-gradient-to-t from-black/95 via-black/70 to-transparent flex items-center justify-between transition-opacity duration-300 z-30 pointer-events-none ${
-              showControls ? "opacity-100" : "opacity-0"
-            }`}
-          >
-            {/* Left Spacer */}
-            <div className="w-16 pointer-events-none" />
-
-            {/* Center: Title & Season/Episode Name (Exact Flixer format) */}
-            <div className="flex flex-col items-center pointer-events-auto text-center px-4 max-w-md truncate">
-              <span className="text-sm font-semibold text-neutral-100 drop-shadow truncate">
-                {movie.title}
-              </span>
-              {isSeries && (
-                <span className="text-xs text-neutral-400 font-mono mt-0.5">
-                  S{currentSeason} Episode {currentEpisode}
+            {/* Left: Back button + Movie Title */}
+            <div className="flex items-center gap-3 pointer-events-auto">
+              <button
+                onClick={onBack}
+                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/10 hover:scale-110 active:scale-95 shadow-xl cursor-pointer"
+                title="Retour au catalogue"
+              >
+                <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.5]" />
+              </button>
+              <div className="flex flex-col">
+                <span className="text-sm sm:text-base font-bold text-white drop-shadow truncate max-w-[200px] sm:max-w-md">
+                  {movie.title}
                 </span>
-              )}
+                {isSeries && (
+                  <span className="text-[11px] sm:text-xs text-neutral-300 font-mono">
+                    S{currentSeason} • Épisode {currentEpisode}
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Right Controls: Exactly 3 Flixer Buttons (Episodes [⧉], Subtitles [💬], Servers [🖧]) */}
-            <div className="flex items-center gap-2.5 sm:gap-3 pointer-events-auto">
-              {/* 1. Episodes Drawer Toggle [⧉] (Series only) */}
+            {/* Right: Quick actions (Episodes + Server Switcher + Fullscreen) */}
+            <div className="flex items-center gap-2 sm:gap-2.5 pointer-events-auto">
+              {/* Episodes Drawer Toggle (Series only) */}
               {isSeries && (
                 <button
                   onClick={() => {
@@ -712,79 +705,49 @@ export default function VideoPlayer({
                     closeAllModals();
                     setShowEpisodesDrawer(next);
                   }}
-                  className={`p-2 rounded-xl transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-semibold backdrop-blur-md border transition-all cursor-pointer ${
                     showEpisodesDrawer
-                      ? "text-[#E50914] bg-white/10"
-                      : "text-white/80 hover:text-white hover:bg-white/5"
+                      ? "bg-[#E50914] text-white border-[#E50914]"
+                      : "bg-black/60 hover:bg-black/80 text-white border-white/15"
                   }`}
-                  title="Épisodes & Saisons"
+                  title="Liste des épisodes"
                 >
-                  <Layers className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                  <Layers className="w-4 h-4 stroke-[2.2]" />
+                  <span className="hidden sm:inline">Épisodes</span>
                 </button>
               )}
 
-              {/* 2. Subtitles Modal Toggle [💬] */}
-              <button
-                onClick={() => {
-                  const next = !showSubtitlesModal;
-                  closeAllModals();
-                  setShowSubtitlesModal(next);
-                }}
-                className={`p-2 rounded-xl transition-all cursor-pointer ${
-                  showSubtitlesModal
-                    ? "text-[#E50914] bg-white/10"
-                    : "text-white/80 hover:text-white hover:bg-white/5"
-                }`}
-                title="Sous-titres & Audio"
-              >
-                <MessageSquare className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
-              </button>
-
-              {/* 3. Servers Modal Toggle [🖧] (Flixer Stacked Servers Icon) */}
+              {/* Server Switcher Pill */}
               <button
                 onClick={() => {
                   const next = !showServerModal;
                   closeAllModals();
                   setShowServerModal(next);
                 }}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer relative ${
+                className={`px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-semibold backdrop-blur-md border transition-all cursor-pointer ${
                   showServerModal
-                    ? "text-[#E50914] bg-white/10"
-                    : "text-white hover:text-neutral-300"
+                    ? "bg-[#E50914] text-white border-[#E50914]"
+                    : "bg-black/60 hover:bg-black/80 text-white border-white/15 hover:border-emerald-500/50"
                 }`}
-                title="Changer de serveur (Flixer Multi-Server)"
+                title="Changer de serveur"
               >
-                <FlixerServerIcon className="w-6 h-6 sm:w-7 sm:h-7" />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <FlixerServerIcon className="w-4 h-4 text-emerald-400" />
+                <span className="capitalize">
+                  {FLIXER_SERVERS.find((s) => s.id === activeServer)?.name || "Serveur"}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               </button>
 
-              {/* 4. Settings Gear Modal Toggle [⚙️] */}
-              <button
-                onClick={() => {
-                  const next = !showSettingsModal;
-                  closeAllModals();
-                  setShowSettingsModal(next);
-                }}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                  showSettingsModal
-                    ? "text-[#E50914] bg-white/10"
-                    : "text-white hover:text-neutral-300"
-                }`}
-                title="Paramètres de lecture"
-              >
-                <Settings className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
-              </button>
-
-              {/* 5. Fullscreen Toggle [⛶] */}
+              {/* Fullscreen Button */}
               <button
                 onClick={toggleFullscreen}
-                className="text-white hover:text-neutral-300 transition-colors cursor-pointer p-1.5"
+                className="w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-all backdrop-blur-md border border-white/15 hover:scale-110 active:scale-95 cursor-pointer"
                 title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
               >
                 {isFullscreen ? (
-                  <Minimize className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                  <Minimize className="w-4 h-4 stroke-[2.2]" />
                 ) : (
-                  <Maximize className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
+                  <Maximize className="w-4 h-4 stroke-[2.2]" />
                 )}
               </button>
             </div>
