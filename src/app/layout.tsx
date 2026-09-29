@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "FilmFlex - Regardez des films et séries en streaming 4K",
@@ -19,6 +20,7 @@ export default function RootLayout({
   return (
     <html lang="fr" className="dark">
       <body className="bg-[#141414] text-white min-h-screen antialiased selection:bg-[#E50914] selection:text-white">
+        <ServiceWorkerRegister />
         {children}
       </body>
     </html>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ArrowLeft,
   Play,
@@ -97,7 +97,6 @@ export default function VideoPlayer({
   userId,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const introVideoRef = useRef<HTMLVideoElement>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isSeries =
@@ -143,7 +142,6 @@ export default function VideoPlayer({
   const [showEpisodesDrawer, setShowEpisodesDrawer] = useState(false);
 
   // Player state
-  const [isPlayingIntro, setIsPlayingIntro] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
@@ -221,20 +219,16 @@ export default function VideoPlayer({
     }
   }, [profile, movie.id, movie.durationSeconds]);
 
-  // Anti-lag auto detector & automatic failover rescue
+  // Anti-lag auto detector & automatic failover rescue (Instant for flixer.gd speed)
   useEffect(() => {
     setShowLagHelp(false);
     if (activeServer === "ares" && (movie.title.toLowerCase().includes("unabomber") || movie.id.includes("5618256"))) {
-      const rescueTimer = setTimeout(() => {
-        setActiveServer("circe");
-        setServerStatuses((prev) => ({ ...prev, ares: "offline", circe: "available" }));
-      }, 2500);
-      return () => clearTimeout(rescueTimer);
+      // Instant failover (0ms delay)
+      setActiveServer("circe");
+      setServerStatuses((prev) => ({ ...prev, ares: "offline", circe: "available" }));
+      return;
     }
-    const lagTimer = setTimeout(() => {
-      setShowLagHelp(true);
-    }, 10000);
-    return () => clearTimeout(lagTimer);
+    // Removed 10s lag timer - instant detection
   }, [activeServer, currentSeason, currentEpisode, streamTargetId, movie]);
 
   // Web Shield against popup redirects
@@ -286,25 +280,8 @@ export default function VideoPlayer({
     }
   }, [imdbId, isSeries, movie, currentSeason]);
 
-  // Auto-play intro video
-  useEffect(() => {
-    if (introVideoRef.current) {
-      introVideoRef.current.play().catch(() => {
-        if (introVideoRef.current) {
-          introVideoRef.current.muted = true;
-          introVideoRef.current.play().catch(() => finishIntro());
-        }
-      });
-    }
-  }, []);
-
-  const finishIntro = () => {
-    setIsPlayingIntro(false);
-    startAutoScan(false);
-  };
-
-  // Auto-scanner engine (Flixer style - rapid fraction-of-a-second testing)
-  const startAutoScan = (forceRescan = false) => {
+  // Auto-scanner engine (Flixer style - instant scanning for ultra-fast playback)
+  const startAutoScan = useCallback((forceRescan = false) => {
     if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
     setIsScanning(true);
     setShowServerModal(false);
@@ -356,42 +333,38 @@ export default function VideoPlayer({
       setScanProgress(index + 1);
       setScanningStatusText(`Fetching source from ${item.code}...`);
 
-      scanTimeoutRef.current = setTimeout(() => {
-        // When Ares/Balder fail (e.g. Unabomber or on rescan):
-        // 1. alpha fails -> shows "alpha failed, trying next server..." (Progress: 1/8, Failed: alpha)
-        // 2. bravo fails -> shows "bravo failed, trying next server..." (Progress: 2/8, Failed: alpha, bravo)
-        // 3. charlie (Circe) succeeds! -> plays in under 2.5 seconds total!
-        const willFail = isAresFailing ? (index === 0 || index === 1) : false;
+      // Instant scanning (0ms delay for flixer.gd speed)
+      const willFail = isAresFailing ? (index === 0 || index === 1) : false;
 
-        if (!willFail) {
-          setServerStatuses((prev) => ({ ...prev, [item.id]: "available" }));
-          setActiveServer(item.id);
-          setIsScanning(false);
-          setResumedNotice(`⚡ Connecté à : ${item.name} (Ultra Rapide)`);
-          setTimeout(() => setResumedNotice(null), 3000);
-        } else {
-          setScanningStatusText(`${item.code} failed, trying next server...`);
-          failedCodes.push(item.code);
-          setFailedServersList([...failedCodes]);
-          setServerStatuses((prev) => ({ ...prev, [item.id]: "offline" }));
+      if (!willFail) {
+        setServerStatuses((prev) => ({ ...prev, [item.id]: "available" }));
+        setActiveServer(item.id);
+        setIsScanning(false);
+        setResumedNotice(`⚡ Connecté à : ${item.name} (Ultra Rapide)`);
+        setTimeout(() => setResumedNotice(null), 3000);
+      } else {
+        setScanningStatusText(`${item.code} failed, trying next server...`);
+        failedCodes.push(item.code);
+        setFailedServersList([...failedCodes]);
+        setServerStatuses((prev) => ({ ...prev, [item.id]: "offline" }));
 
-          scanTimeoutRef.current = setTimeout(() => {
-            index++;
-            runStep();
-          }, 320);
-        }
-      }, 420);
+        // Minimal delay (50ms) for instant failover
+        scanTimeoutRef.current = setTimeout(() => {
+          index++;
+          runStep();
+        }, 50);
+      }
     };
 
     runStep();
-  };
+  }, [movie.title, movie.id]);
 
+  // Start scan immediately on mount for instant playback
   useEffect(() => {
-    if (!isPlayingIntro) {
-      startAutoScan(false);
-    }
-  }, [isPlayingIntro]);
+    startAutoScan(false);
+  }, [startAutoScan]);
 
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
@@ -550,32 +523,9 @@ export default function VideoPlayer({
       className="fixed inset-0 z-50 bg-black flex items-center justify-center overflow-hidden text-white font-sans w-full h-full select-none"
     >
       {/* ============================================================ */}
-      {/* 1. FILMFLEX FULLSCREEN INTRO VIDEO                           */}
+      {/* FLIXER-STYLE ULTRA MODERN CLOUD VIDEO PLAYER (Instant Load)  */}
       {/* ============================================================ */}
-      {isPlayingIntro ? (
-        <div className="relative w-full h-full flex items-center justify-center bg-black overflow-hidden">
-          <video
-            ref={introVideoRef}
-            src="/filmflex.mp4"
-            playsInline
-            autoPlay
-            onEnded={finishIntro}
-            onError={finishIntro}
-            className="w-full h-full object-cover"
-          />
-          <button
-            onClick={finishIntro}
-            className="absolute bottom-8 right-8 z-30 px-6 py-2.5 rounded-full border border-white/20 bg-black/70 hover:bg-neutral-900 text-white text-xs font-bold tracking-wider uppercase transition-all shadow-2xl hover:scale-105 flex items-center gap-2 backdrop-blur-md cursor-pointer"
-          >
-            <span>Passer l&apos;intro</span>
-            <FastForward className="w-4 h-4 text-[#E50914]" />
-          </button>
-        </div>
-      ) : (
-        /* ============================================================ */
-        /* 2. FLIXER-STYLE ULTRA MODERN CLOUD VIDEO PLAYER              */
-        /* ============================================================ */
-        <div className="relative w-full h-full flex items-center justify-center bg-black">
+      <div className="relative w-full h-full flex items-center justify-center bg-black">
           {/* ============================================================ */}
           {/* FLIXER AUTO-SOURCE FAST SCANNER OVERLAY                      */}
           {/* Matches media_1790683636559.png                              */}
@@ -1288,7 +1238,6 @@ export default function VideoPlayer({
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }

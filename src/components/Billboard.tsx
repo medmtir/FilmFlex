@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Play, Plus, Check, Info, Volume2, VolumeX, Sparkles } from "lucide-react";
 import { Movie } from "@/types";
+import OptimizedImage from "@/components/OptimizedImage";
 
 interface BillboardProps {
   movie: Movie;
@@ -26,10 +27,11 @@ export default function Billboard({
       {/* ============================================================ */}
       <div className="md:hidden relative w-full h-[65vh] rounded-3xl overflow-hidden shadow-2xl shadow-black/80 border border-neutral-800">
         {/* Full portrait poster image */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <OptimizedImage
           src={movie.posterUrl || movie.backdropUrl}
           alt={movie.title}
+          fill
+          priority={true}
           className="w-full h-full object-cover object-center filter brightness-[0.9]"
         />
 
@@ -99,10 +101,11 @@ export default function Billboard({
       <div className="hidden md:flex relative w-full rounded-3xl overflow-hidden bg-gradient-to-r from-[#18181b] via-[#121216] to-[#0c0c0e] border border-neutral-800/80 shadow-[0_25px_60px_rgba(0,0,0,0.9)] min-h-[440px] items-center">
         {/* Background / Character Visual on Left Side */}
         <div className="absolute inset-0 w-[65%] h-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <OptimizedImage
             src={movie.backdropUrl}
             alt={movie.title}
+            fill
+            priority={true}
             className="w-full h-full object-cover object-center filter brightness-95 transition-transform duration-1000 hover:scale-105"
           />
 

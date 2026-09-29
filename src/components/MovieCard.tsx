@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Play, Plus, Check, Info } from "lucide-react";
 import { Movie, WatchProgress } from "@/types";
 import { INITIAL_MOVIES, TURKISH_MOVIES } from "@/lib/constants";
+import OptimizedImage from "@/components/OptimizedImage";
 
 interface MovieCardProps {
   movie: Movie;
@@ -90,12 +91,12 @@ export default function MovieCard({
           }`}
         >
           {/* Card Poster / Backdrop */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <OptimizedImage
             src={isPortrait ? movie.posterUrl : movie.backdropUrl || movie.posterUrl}
             alt={movie.title}
+            fill
+            priority={false}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
           />
 
           {/* FilmFlex Original Mini Badge */}
@@ -156,10 +157,11 @@ export default function MovieCard({
         >
           {/* Top Video Preview / Backdrop */}
           <div className="relative aspect-[16/9] w-full overflow-hidden bg-black">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <OptimizedImage
               src={movie.backdropUrl || movie.posterUrl}
               alt={movie.title}
+              fill
+              priority={false}
               className="w-full h-full object-cover scale-105 transition-transform duration-500"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#18181b] via-transparent to-transparent pointer-events-none z-10" />
@@ -264,12 +266,12 @@ export default function MovieCard({
                       className="aspect-[2/3] rounded-md overflow-hidden bg-neutral-800 border border-neutral-700/60 hover:border-white transition-all cursor-pointer hover:scale-105 shadow"
                       title={rel.title}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <OptimizedImage
                         src={rel.posterUrl || rel.backdropUrl}
                         alt={rel.title}
+                        fill
+                        priority={false}
                         className="w-full h-full object-cover"
-                        loading="lazy"
                       />
                     </div>
                   ))}
