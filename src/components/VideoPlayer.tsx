@@ -442,11 +442,11 @@ export default function VideoPlayer({
         : `https://autoembed.co/movie/tmdb/${streamTargetId}`;
     }
 
-    // 4. Circe: Vidsrc CC VIP 4K
+    // 4. Circe: Vidsrc VIP 4K (Ultra Fast Cloud - Zero Frame Blocking)
     if (srv === "circe") {
       return isSeries
-        ? `https://vidsrc.cc/v2/embed/tv/${streamTargetId}/${currentSeason}/${currentEpisode}?autoPlay=true`
-        : `https://vidsrc.cc/v2/embed/movie/${streamTargetId}?autoPlay=true`;
+        ? `https://vidsrc.sh/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
+        : `https://vidsrc.sh/embed/movie?tmdb=${streamTargetId}`;
     }
 
     // 5. Dionysus: MultiEmbed Fast CDN
@@ -456,11 +456,11 @@ export default function VideoPlayer({
         : `https://multiembed.mov/?video_id=${streamTargetId}&tmdb=${movie.tmdbId ? 1 : 0}`;
     }
 
-    // 6. Eros: Vidsrc Me VIP
+    // 6. Eros: Vidsrc Net / Me
     if (srv === "eros") {
       return isSeries
-        ? `https://vidsrc.me/embed/tv?tmdb=${streamTargetId}&season=${currentSeason}&episode=${currentEpisode}`
-        : `https://vidsrc.me/embed/movie?tmdb=${streamTargetId}`;
+        ? `https://vidsrc.net/embed/tv/${imdbId}/${currentSeason}/${currentEpisode}`
+        : `https://vidsrc.net/embed/movie/${imdbId}`;
     }
 
     // 7. Freya: 2Embed / SuperEmbed
@@ -638,7 +638,7 @@ export default function VideoPlayer({
               className="w-full h-full border-0 absolute inset-0 z-10"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
               allowFullScreen
-              referrerPolicy="origin"
+              referrerPolicy="no-referrer"
             />
           )}
 
@@ -710,103 +710,23 @@ export default function VideoPlayer({
               showControls ? "opacity-100" : "opacity-0"
             }`}
           >
-            {/* Left Controls: Play/Pause, Rewind 10s, Forward 10s, Volume */}
-            <div className="flex items-center gap-3 sm:gap-4 pointer-events-auto">
-              {/* Play / Pause Toggle */}
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="text-white hover:text-neutral-300 transition-colors cursor-pointer p-1"
-                title={isPlaying ? "Pause" : "Lecture"}
-              >
-                {isPlaying ? (
-                  <Pause className="w-7 h-7 sm:w-8 sm:h-8 fill-white" />
-                ) : (
-                  <Play className="w-7 h-7 sm:w-8 sm:h-8 fill-white ml-0.5" />
-                )}
-              </button>
+            {/* Left Spacer */}
+            <div className="w-16 pointer-events-none" />
 
-              {/* Rewind 10s */}
-              <button
-                onClick={() => {
-                  setResumedNotice("⟲ -10 secondes");
-                  setTimeout(() => setResumedNotice(null), 1500);
-                }}
-                className="relative text-white hover:text-neutral-300 transition-transform active:scale-90 cursor-pointer p-1"
-                title="Reculer de 10s"
-              >
-                <RotateCcw className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
-                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tracking-tighter pt-0.5">
-                  10
-                </span>
-              </button>
-
-              {/* Forward 10s */}
-              <button
-                onClick={() => {
-                  setResumedNotice("10 ⟳ +10 secondes");
-                  setTimeout(() => setResumedNotice(null), 1500);
-                }}
-                className="relative text-white hover:text-neutral-300 transition-transform active:scale-90 cursor-pointer p-1"
-                title="Avancer de 10s"
-              >
-                <RotateCw className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2]" />
-                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tracking-tighter pt-0.5">
-                  10
-                </span>
-              </button>
-
-              {/* Volume Button with hover slider */}
-              <div
-                className="relative flex items-center"
-                onMouseEnter={() => setShowVolumeSlider(true)}
-                onMouseLeave={() => setShowVolumeSlider(false)}
-              >
-                <button
-                  onClick={() => setIsMuted(!isMuted)}
-                  className="text-white hover:text-neutral-300 transition-colors cursor-pointer p-1"
-                  title={isMuted ? "Activer le son" : "Couper le son"}
-                >
-                  {isMuted || volume === 0 ? (
-                    <VolumeX className="w-6 h-6 sm:w-7 sm:h-7" />
-                  ) : (
-                    <Volume2 className="w-6 h-6 sm:w-7 sm:h-7" />
-                  )}
-                </button>
-
-                {showVolumeSlider && (
-                  <div className="absolute left-8 bottom-1/2 translate-y-1/2 bg-black/90 px-3 py-1.5 rounded-full border border-white/10 backdrop-blur-md shadow-xl flex items-center animate-fade-in">
-                    <input
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      value={isMuted ? 0 : volume}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setVolume(val);
-                        setIsMuted(val === 0);
-                      }}
-                      className="w-20 accent-[#E50914] cursor-pointer h-1 bg-neutral-700 rounded-lg"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Center: Title & Season/Episode Name (Matching Flixer) */}
-            <div className="hidden md:flex flex-col items-center pointer-events-auto text-center px-4 max-w-md truncate">
+            {/* Center: Title & Season/Episode Name (Exact Flixer format) */}
+            <div className="flex flex-col items-center pointer-events-auto text-center px-4 max-w-md truncate">
               <span className="text-sm font-semibold text-neutral-100 drop-shadow truncate">
                 {movie.title}
               </span>
               {isSeries && (
-                <span className="text-xs text-neutral-400 font-mono">
+                <span className="text-xs text-neutral-400 font-mono mt-0.5">
                   S{currentSeason} Episode {currentEpisode}
                 </span>
               )}
             </div>
 
-            {/* Right Controls: Episodes [⧉], Subtitles [💬], Servers [🖥️], Settings [⚙️], Fullscreen [⛶] */}
-            <div className="flex items-center gap-3 sm:gap-4 pointer-events-auto">
+            {/* Right Controls: Exactly 3 Flixer Buttons (Episodes [⧉], Subtitles [💬], Servers [🖧]) */}
+            <div className="flex items-center gap-2.5 sm:gap-3 pointer-events-auto">
               {/* 1. Episodes Drawer Toggle [⧉] (Series only) */}
               {isSeries && (
                 <button
@@ -815,10 +735,10 @@ export default function VideoPlayer({
                     closeAllModals();
                     setShowEpisodesDrawer(next);
                   }}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  className={`p-2 rounded-xl transition-all cursor-pointer ${
                     showEpisodesDrawer
                       ? "text-[#E50914] bg-white/10"
-                      : "text-white hover:text-neutral-300"
+                      : "text-white/80 hover:text-white hover:bg-white/5"
                   }`}
                   title="Épisodes & Saisons"
                 >
@@ -833,10 +753,10 @@ export default function VideoPlayer({
                   closeAllModals();
                   setShowSubtitlesModal(next);
                 }}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                className={`p-2 rounded-xl transition-all cursor-pointer ${
                   showSubtitlesModal
                     ? "text-[#E50914] bg-white/10"
-                    : "text-white hover:text-neutral-300"
+                    : "text-white/80 hover:text-white hover:bg-white/5"
                 }`}
                 title="Sous-titres & Audio"
               >
