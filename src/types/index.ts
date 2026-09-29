@@ -26,6 +26,7 @@ export interface Episode {
 export interface Movie {
   id: string;
   imdbId?: string;
+  tmdbId?: string;
   title: string;
   originalTitle?: string;
   description: string;

@@ -1185,6 +1185,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt10705474",
     imdbId: "tt10705474",
+    tmdbId: "95603",
     title: "Kuruluş: Osman (المؤسس عثمان)",
     originalTitle: "Kurulus: Osman",
     description: "Les luttes internes et externes épiques d'Osman Ier et la façon dont il fonde et contrôle l'Empire Ottoman, surmontant trahisons, ennemis mongols et byzantins.",
@@ -1212,6 +1213,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt21966558",
     imdbId: "tt21966558",
+    tmdbId: "209374",
     title: "Yalı Çapkını (طائر الرفراف)",
     originalTitle: "Yali Çapkini",
     description: "Ferit, un jeune séducteur insouciant issu d'une famille d'élite d'Istanbul, se voit forcé par son grand-père d'épouser Seyran, une jeune femme d'Antep, déclenchant passions et tourments.",
@@ -1239,6 +1241,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt7380182",
     imdbId: "tt7380182",
+    tmdbId: "74866",
     title: "Çukur (الحفرة)",
     originalTitle: "Çukur",
     description: "La famille Koçovalı règne sur Çukur, un quartier dangereux d'Istanbul avec ses propres lois. Lorsque la menace d'un gang rival surgit, le fils prodige Yamaç doit rentrer protéger son clan.",
@@ -1266,6 +1269,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt4320258",
     imdbId: "tt4320258",
+    tmdbId: "66017",
     title: "Diriliş: Ertuğrul (قيامة أرطغرل)",
     originalTitle: "Dirilis: Ertugrul",
     description: "Au XIIIe siècle, le noble guerrier Ertuğrul lutte pour offrir une terre et un avenir à sa tribu Kaya, affrontant Templiers, Mongols et trahisons à l'aube de l'Empire Ottoman.",
@@ -1292,6 +1296,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt12439466",
     imdbId: "tt12439466",
+    tmdbId: "104877",
     title: "Sen Çal Kapımı (أنت اطرق بابي)",
     originalTitle: "Sen Çal Kapimi",
     description: "Eda Yıldız, étudiante brillante, voit sa bourse internationale supprimée par le séduisant architecte Serkan Bolat. Il lui propose un faux fiancé pendant deux mois en échange de ses études.",
@@ -1318,6 +1323,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt22340578",
     imdbId: "tt22340578",
+    tmdbId: "211174",
     title: "Kızılcık Şerbeti (شراب التوت)",
     originalTitle: "Kizilcik Serbeti",
     description: "L'union amoureuse de Doğa et Fatih réunit deux familles turques aux modes de vie et valeurs diamétralement opposés, déclenchant conflits sociaux et drames intimes poignants.",
@@ -1344,6 +1350,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt10431500",
     imdbId: "tt10431500",
+    tmdbId: "615952",
     title: "Miracle in Cell No. 7 (معجزة في الزنزانة 7)",
     originalTitle: "7. Kogustaki Mucize",
     description: "Memo, un père handicapé mental séparé de sa petite fille Ova, est injustement condamné à mort pour le meurtre d'une fillette de commandant. Ses compagnons de cellule vont tenter l'impossible.",
@@ -1370,6 +1377,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt5030248",
     imdbId: "tt5030248",
+    tmdbId: "64551",
     title: "Kara Sevda (حب أعمى)",
     originalTitle: "Kara Sevda",
     description: "Kemal, issu d'une famille modeste, et Nihan, issue d'une famille aisée, vivent un amour passionné jusqu'au jour où un chantage force Nihan à épouser le riche et possessif Emir.",
@@ -1396,6 +1404,7 @@ export const TURKISH_MOVIES: Movie[] = [
   {
     id: "tt15330386",
     imdbId: "tt15330386",
+    tmdbId: "134049",
     title: "Yargı (القضاء)",
     originalTitle: "Yargi",
     description: "Ilgaz, un procureur respecté et intègre, et Ceylin, une avocate audacieuse prête à contourner les règles, voient leurs chemins se croiser sur une affaire de meurtre complexe liée à leurs propres familles.",
