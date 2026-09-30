@@ -14,6 +14,7 @@ import {
   Info,
   Film,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { Movie, Episode } from "@/types";
 import {
@@ -452,14 +453,32 @@ export default function MobileMovieDetailsSheet({
             {(activeTab === "trailers" || !isSeries) && (
               <div className="pt-4 space-y-4">
                 {movie.trailerYoutubeId ? (
-                  <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-neutral-800">
-                    <iframe
-                      src={`https://www.youtube.com/embed/${movie.trailerYoutubeId}?modestbranding=1&rel=0`}
-                      title="Bande-annonce"
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+                  <div className="space-y-2">
+                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-neutral-800">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
+                          typeof window !== "undefined" ? window.location.origin : ""
+                        )}&widget_referrer=${encodeURIComponent(
+                          typeof window !== "undefined" ? window.location.origin : ""
+                        )}`}
+                        title="Bande-annonce"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        referrerPolicy="strict-origin-when-cross-origin"
+                        allowFullScreen
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <a
+                        href={`https://www.youtube.com/watch?v=${movie.trailerYoutubeId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-[#E50914] transition-colors"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Regarder sur YouTube si la vidéo est restreinte (Erreur 153)</span>
+                      </a>
+                    </div>
                   </div>
                 ) : (
                   <div className="py-8 text-center text-neutral-500 text-xs">

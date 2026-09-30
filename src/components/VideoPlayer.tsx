@@ -415,13 +415,18 @@ export default function VideoPlayer({
     const srv = targetServer || activeServer;
 
     // 1. Tunisian Cinema & Series
-    if (isTunisian) {
+    if (isTunisian && (!targetServer || srv === "ares")) {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
       if (movie.id.includes("choufly")) {
         const epIndex = Math.max(0, currentEpisode - 1);
-        return `https://www.youtube.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1&rel=0&modestbranding=1`;
+        return `https://www.youtube-nocookie.com/embed/videoseries?list=PLtKHe7Z2QnnH8hjtv4Ehv4x00ZDIhifUr&index=${epIndex}&autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
+          origin
+        )}&widget_referrer=${encodeURIComponent(origin)}`;
       }
       if (movie.trailerYoutubeId) {
-        return `https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+        return `https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
+          origin
+        )}&widget_referrer=${encodeURIComponent(origin)}`;
       }
       if (movie.videoUrl && movie.videoUrl !== "/sample.mp4") {
         return movie.videoUrl;

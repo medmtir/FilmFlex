@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download, Loader2, Film } from "lucide-react";
+import { X, Play, Plus, Check, ThumbsUp, Volume2, VolumeX, Sparkles, ChevronDown, Share2, Download, Loader2, Film, ExternalLink } from "lucide-react";
 import { Movie, Episode } from "@/types";
 import { startDownload, isItemDownloaded, isItemDownloading, onDownloadsUpdated } from "@/lib/downloadManager";
 
@@ -24,11 +24,48 @@ export default function MovieModal({
 }: MovieModalProps) {
   const [showTrailer, setShowTrailer] = useState(false);
   const [isTrailerMuted, setIsTrailerMuted] = useState(false);
+  const [youtubeError, setYoutubeError] = useState(false);
   const [episodes, setEpisodes] = useState<Episode[]>([]);
   const [selectedSeason, setSelectedSeason] = useState<number>(1);
   const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [isLiked, setIsLiked] = useState(false);
+
+  useEffect(() => {
+    setYoutubeError(false);
+  }, [movie, showTrailer]);
+
+  // YouTube Error 150/153 listener via postMessage API
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        let data = event.data;
+        if (typeof data === "string") {
+          try {
+            data = JSON.parse(data);
+          } catch {
+            return;
+          }
+        }
+        if (
+          data &&
+          (data.event === "onError" ||
+            data.info === 150 ||
+            data.info === 153 ||
+            data.info === 101 ||
+            data.info === 100 ||
+            data.info === 5 ||
+            data.info === 2)
+        ) {
+          console.warn("YouTube embed restriction (Error 153/150):", data);
+          setYoutubeError(true);
+        }
+      } catch {}
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const handleDownload = async (ep?: Episode) => {
     if (!movie) return;
@@ -126,33 +163,87 @@ export default function MovieModal({
         )}
 
         {/* Top Media: Trailer or High-Res Backdrop */}
-        <div className="relative aspect-[16/9] w-full bg-black">
-          {showTrailer && movie.trailerYoutubeId ? (
+        <div className="relative aspect-[16/9] w-full bg-black overflow-hidden">
+          {showTrailer && movie.trailerYoutubeId && !youtubeError ? (
             <div className="relative w-full h-full pointer-events-auto">
               <iframe
-                src={`https://www.youtube.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
+                src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
                   isTrailerMuted ? 1 : 0
-                }&controls=1&modestbranding=1&rel=0&playsinline=1`}
+                }&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
+                  typeof window !== "undefined" ? window.location.origin : ""
+                )}&widget_referrer=${encodeURIComponent(
+                  typeof window !== "undefined" ? window.location.origin : ""
+                )}`}
                 title={movie.title}
                 className="w-full h-full object-cover"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
               />
-              <button
-                onClick={() => setShowTrailer(false)}
-                className="absolute top-4 left-4 z-20 px-3 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Retour à l&apos;affiche</span>
-              </button>
+              <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                <button
+                  onClick={() => setShowTrailer(false)}
+                  className="px-3 py-1.5 rounded-full bg-black/80 hover:bg-black text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all cursor-pointer shadow-lg hover:scale-105 active:scale-95"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Retour à l&apos;affiche</span>
+                </button>
+
+                <a
+                  href={`https://www.youtube.com/watch?v=${movie.trailerYoutubeId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 rounded-full bg-black/80 hover:bg-[#E50914] text-white text-xs font-semibold backdrop-blur-md border border-white/20 flex items-center gap-1.5 transition-all shadow-lg hover:scale-105 active:scale-95"
+                  title="Ouvrir directement sur YouTube"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">YouTube</span>
+                </a>
+              </div>
             </div>
           ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={movie.backdropUrl || movie.posterUrl}
-              alt={movie.title}
-              className="w-full h-full object-cover"
-            />
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={movie.backdropUrl || movie.posterUrl}
+                alt={movie.title}
+                className="w-full h-full object-cover"
+              />
+
+              {/* Graceful Fallback if YouTube Error 153 occurred */}
+              {youtubeError && (
+                <div className="absolute inset-0 bg-black/75 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20 animate-fade-in">
+                  <div className="p-3 rounded-full bg-[#E50914]/20 border border-[#E50914]/40 text-[#E50914] mb-3 shadow-lg">
+                    <Film className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-sm sm:text-base font-bold text-white mb-1">
+                    Bande-annonce restreinte par YouTube (Code 153)
+                  </h3>
+                  <p className="text-xs text-neutral-300 max-w-sm mb-4 leading-relaxed">
+                    Cette vidéo n&apos;autorise pas la lecture intégrée. Vous pouvez la regarder directement sur YouTube.
+                  </p>
+                  <div className="flex items-center gap-2.5">
+                    <a
+                      href={`https://www.youtube.com/watch?v=${movie.trailerYoutubeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-[#E50914] hover:bg-[#b80710] text-white text-xs font-bold transition-all shadow-lg flex items-center gap-2 cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      <span>Regarder sur YouTube</span>
+                    </a>
+                    <button
+                      onClick={() => {
+                        setYoutubeError(false);
+                        setShowTrailer(false);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Retour
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Gradients */}
