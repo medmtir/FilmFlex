@@ -169,14 +169,11 @@ export default function MovieModal({
               <iframe
                 src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?autoplay=1&mute=${
                   isTrailerMuted ? 1 : 0
-                }&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
-                  typeof window !== "undefined" ? window.location.origin : ""
-                )}&widget_referrer=${encodeURIComponent(
-                  typeof window !== "undefined" ? window.location.origin : ""
-                )}`}
+                }&controls=1&modestbranding=1&rel=0&playsinline=1`}
                 title={movie.title}
                 className="w-full h-full object-cover"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                allowFullScreen
                 referrerPolicy="strict-origin-when-cross-origin"
               />
               <div className="absolute top-4 left-4 z-20 flex items-center gap-2">

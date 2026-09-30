@@ -456,14 +456,10 @@ export default function MobileMovieDetailsSheet({
                   <div className="space-y-2">
                     <div className="aspect-video w-full rounded-xl overflow-hidden bg-black border border-neutral-800">
                       <iframe
-                        src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?modestbranding=1&rel=0&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(
-                          typeof window !== "undefined" ? window.location.origin : ""
-                        )}&widget_referrer=${encodeURIComponent(
-                          typeof window !== "undefined" ? window.location.origin : ""
-                        )}`}
+                        src={`https://www.youtube-nocookie.com/embed/${movie.trailerYoutubeId}?modestbranding=1&rel=0&playsinline=1`}
                         title="Bande-annonce"
                         className="w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                         referrerPolicy="strict-origin-when-cross-origin"
                         allowFullScreen
                       />
